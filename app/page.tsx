@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
-import { Send, Sparkles, ChevronDown, Check, Lightbulb, Palette, Camera, Eye, Copy, RotateCcw, Clock, Sliders } from "lucide-react"
+import { Send, Sparkles, ChevronDown, Check, Lightbulb, Palette, Camera, Eye, Copy, ArrowLeft, Clock } from "lucide-react"
 
 // Types
 interface Message {
   id: string
-  type: "user" | "ai-thinking" | "ai-observation" | "ai-insight"
+  type: "user" | "ai-insight" | "ai-transition"
   content: string
 }
 
@@ -23,35 +23,30 @@ interface Direction {
   id: string
   title: string
   description: string
-  moodTags: string[]
-  confidence: number
+  alignmentLabel: string
+  previewGradient: string
+  previewAccent: string
   promptTemplate: string
+}
+
+interface PromptFragment {
+  id: string
+  text: string
+  isEditable: boolean
+  alternatives?: string[]
 }
 
 interface PromptVersion {
   id: string
-  timestamp: string
-  content: string
-  changes: string[]
-}
-
-interface SemanticControl {
-  id: string
   label: string
-  leftLabel: string
-  rightLabel: string
-  value: number
+  fragments: PromptFragment[]
+  timestamp: string
 }
 
-// Realistic AI thinking messages
+// Shortened AI messages - only 2 before exploration
 const thinkingSequence: Message[] = [
-  { id: "t1", type: "ai-thinking", content: "Parsing your creative intent..." },
-  { id: "t2", type: "ai-observation", content: "I notice you're describing a mood-driven scene. The rain and city lights suggest an urban noir aesthetic, while the contemplative figure creates emotional depth." },
-  { id: "t3", type: "ai-thinking", content: "Analyzing visual components..." },
-  { id: "t4", type: "ai-observation", content: "Key elements detected: environmental atmosphere (rain, wet surfaces), lighting conditions (city reflections), subject positioning (standing figure), and emotional tone (contemplative)." },
-  { id: "t5", type: "ai-thinking", content: "Mapping to visual language..." },
-  { id: "t6", type: "ai-insight", content: "This prompt has strong cinematic potential. The interplay between harsh urban environment and human vulnerability creates natural tension." },
-  { id: "t7", type: "ai-thinking", content: "Identifying dimensions that need refinement..." },
+  { id: "t1", type: "ai-insight", content: "I'm detecting a cinematic urban mood with emotional isolation themes." },
+  { id: "t2", type: "ai-transition", content: "Several visual directions are emerging." },
 ]
 
 // Detected analysis data
@@ -65,38 +60,96 @@ const initialDimensions: MissingDimension[] = [
   { id: "focus", label: "Subject Focus", icon: <Eye className="w-4 h-4" />, options: ["Sharp foreground blur", "Soft overall focus", "Deep depth of field", "Selective bokeh"] },
 ]
 
+// Directions with visual previews and semantic alignment labels
 const directions: Direction[] = [
   { 
     id: "d1", 
     title: "Blade Runner Homage", 
-    description: "Heavy neon saturation with cyan and magenta reflections. Subject as silhouette against luminous city backdrop, emphasizing scale and alienation.", 
-    moodTags: ["cyberpunk", "dystopian", "neon"], 
-    confidence: 0.92,
-    promptTemplate: "A lone figure stands in heavy rain on a neon-lit city street at night. Blade Runner aesthetic with heavy cyan and magenta neon reflections on wet pavement. Subject rendered as a dark silhouette against the luminous urban backdrop. Cinematic composition emphasizing human scale against towering architecture. Atmospheric fog diffusing the countless neon signs. Photorealistic, 8K, dramatic lighting."
+    description: "Heavy neon saturation with cyan and magenta reflections. Subject as silhouette against luminous city backdrop.", 
+    alignmentLabel: "Strong alignment",
+    previewGradient: "from-cyan-500/30 via-fuchsia-500/20 to-blue-900/40",
+    previewAccent: "cyan",
+    promptTemplate: "A lone figure stands in heavy rain on a [neon-lit] city street at night. Blade Runner aesthetic with [heavy cyan and magenta] neon reflections on wet pavement. Subject rendered as a [dark silhouette] against the luminous urban backdrop. [Cinematic composition] emphasizing human scale against towering architecture. Atmospheric fog diffusing the countless neon signs. Photorealistic, dramatic lighting."
   },
   { 
     id: "d2", 
     title: "Wong Kar-wai Romance", 
-    description: "Intimate framing with motion blur and warm tungsten lighting bleeding through rain. Focus on emotional vulnerability and fleeting moments.", 
-    moodTags: ["intimate", "dreamy", "warm"], 
-    confidence: 0.87,
-    promptTemplate: "Intimate portrait of a contemplative figure in gentle rain, city lights softly blurred in background. Wong Kar-wai inspired cinematography with warm tungsten tones bleeding through cool blue atmosphere. Subtle motion blur suggesting fleeting moments. Shallow depth of field focusing on emotional expression. Film grain texture, melancholic beauty, 35mm aesthetic."
+    description: "Intimate framing with motion blur and warm tungsten lighting bleeding through rain.", 
+    alignmentLabel: "Emotionally grounded",
+    previewGradient: "from-amber-500/30 via-orange-400/20 to-rose-900/30",
+    previewAccent: "amber",
+    promptTemplate: "Intimate portrait of a contemplative figure in [gentle rain], city lights [softly blurred] in background. Wong Kar-wai inspired cinematography with [warm tungsten tones] bleeding through cool blue atmosphere. Subtle motion blur suggesting fleeting moments. [Shallow depth of field] focusing on emotional expression. Film grain texture, melancholic beauty."
   },
   { 
     id: "d3", 
     title: "Contemporary Realism", 
-    description: "Naturalistic lighting with muted color palette. Documentary-style framing that grounds the scene in authentic urban atmosphere.", 
-    moodTags: ["authentic", "grounded", "subtle"], 
-    confidence: 0.78,
-    promptTemplate: "Documentary-style photograph of a person standing alone in urban rain. Natural city lighting with muted, desaturated color palette. Authentic street photography composition, unposed and candid feeling. Overcast ambient lighting with subtle reflections on wet concrete. Contemporary realism, editorial quality, medium format aesthetic."
+    description: "Naturalistic lighting with muted color palette. Documentary-style framing.", 
+    alignmentLabel: "Experimental direction",
+    previewGradient: "from-slate-500/30 via-zinc-400/20 to-neutral-800/40",
+    previewAccent: "slate",
+    promptTemplate: "Documentary-style photograph of a person standing alone in [urban rain]. [Natural city lighting] with muted, desaturated color palette. Authentic street photography composition, [unposed and candid] feeling. Overcast ambient lighting with subtle reflections on wet concrete. Contemporary realism, editorial quality."
   },
 ]
 
-const initialSemanticControls: SemanticControl[] = [
-  { id: "mood", label: "Atmosphere", leftLabel: "Subtle", rightLabel: "Dramatic", value: 65 },
-  { id: "detail", label: "Detail Level", leftLabel: "Minimal", rightLabel: "Intricate", value: 50 },
-  { id: "abstraction", label: "Style", leftLabel: "Realistic", rightLabel: "Stylized", value: 35 },
-]
+// Parse prompt template into fragments
+function parsePromptToFragments(template: string): PromptFragment[] {
+  const fragments: PromptFragment[] = []
+  const regex = /\[([^\]]+)\]/g
+  let lastIndex = 0
+  let match
+  let id = 0
+
+  while ((match = regex.exec(template)) !== null) {
+    // Add text before the bracket
+    if (match.index > lastIndex) {
+      fragments.push({
+        id: `f${id++}`,
+        text: template.slice(lastIndex, match.index),
+        isEditable: false
+      })
+    }
+    
+    // Add the editable fragment
+    fragments.push({
+      id: `f${id++}`,
+      text: match[1],
+      isEditable: true,
+      alternatives: getAlternativesForFragment(match[1])
+    })
+    
+    lastIndex = match.index + match[0].length
+  }
+  
+  // Add remaining text
+  if (lastIndex < template.length) {
+    fragments.push({
+      id: `f${id++}`,
+      text: template.slice(lastIndex),
+      isEditable: false
+    })
+  }
+  
+  return fragments
+}
+
+// Get semantic alternatives for editable fragments
+function getAlternativesForFragment(text: string): string[] {
+  const alternativesMap: Record<string, string[]> = {
+    "neon-lit": ["soft tungsten glow", "overcast realism", "cinematic haze", "harsh noir contrast"],
+    "heavy cyan and magenta": ["muted teal tones", "warm amber wash", "cold blue monochrome", "desaturated pastels"],
+    "dark silhouette": ["softly lit figure", "partial shadow", "backlit outline", "detailed presence"],
+    "Cinematic composition": ["Documentary framing", "Intimate portrait", "Wide establishing shot", "Abstract crop"],
+    "gentle rain": ["heavy downpour", "misty drizzle", "scattered droplets", "storm aftermath"],
+    "softly blurred": ["sharply focused", "motion streaked", "dreamlike haze", "crisp detail"],
+    "warm tungsten tones": ["cool blue cast", "neutral daylight", "golden hour warmth", "neon color splash"],
+    "Shallow depth of field": ["Deep focus throughout", "Selective bokeh", "Tilt-shift effect", "Sharp foreground blur"],
+    "urban rain": ["city drizzle", "night storm", "wet aftermath", "passing shower"],
+    "Natural city lighting": ["Dramatic neon glow", "Soft ambient light", "Harsh streetlamp", "Diffused overcast"],
+    "unposed and candid": ["carefully composed", "dynamically posed", "frozen in motion", "contemplatively still"],
+  }
+  
+  return alternativesMap[text] || ["subtle variation", "dramatic interpretation", "minimal approach", "bold alternative"]
+}
 
 export default function AIWorkspace() {
   const [userInput, setUserInput] = useState("")
@@ -112,10 +165,12 @@ export default function AIWorkspace() {
   const [selectedDirection, setSelectedDirection] = useState<string | null>(null)
   const [showPromptWorkspace, setShowPromptWorkspace] = useState(false)
   const [promptPhase, setPromptPhase] = useState(0)
-  const [semanticControls, setSemanticControls] = useState<SemanticControl[]>(initialSemanticControls)
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
   const [activeVersion, setActiveVersion] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [hoveredFragment, setHoveredFragment] = useState<string | null>(null)
+  const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
+  const [recentlyChanged, setRecentlyChanged] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -126,23 +181,34 @@ export default function AIWorkspace() {
     scrollToBottom()
   }, [messages, streamedContent])
 
-  // Get current prompt based on selected direction
-  const getCurrentPrompt = useCallback(() => {
+  // Get current prompt fragments
+  const getCurrentFragments = useCallback((): PromptFragment[] => {
+    if (activeVersion && promptVersions.length > 0) {
+      const version = promptVersions.find(v => v.id === activeVersion)
+      if (version) return version.fragments
+    }
     const direction = directions.find(d => d.id === selectedDirection)
-    return direction?.promptTemplate || ""
-  }, [selectedDirection])
+    if (direction) return parsePromptToFragments(direction.promptTemplate)
+    return []
+  }, [selectedDirection, activeVersion, promptVersions])
+
+  // Get prompt as string
+  const getPromptString = useCallback(() => {
+    return getCurrentFragments().map(f => f.text).join('')
+  }, [getCurrentFragments])
 
   // Initialize prompt versions when direction is selected
   useEffect(() => {
     if (selectedDirection && promptVersions.length === 0) {
       const direction = directions.find(d => d.id === selectedDirection)
       if (direction) {
+        const fragments = parsePromptToFragments(direction.promptTemplate)
         setPromptVersions([
           {
             id: "v1",
-            timestamp: "Just now",
-            content: direction.promptTemplate,
-            changes: ["Initial prompt generated from direction"]
+            label: `Initial ${direction.title.toLowerCase()} interpretation`,
+            fragments,
+            timestamp: "Just now"
           }
         ])
         setActiveVersion("v1")
@@ -157,7 +223,6 @@ export default function AIWorkspace() {
         setShowPromptWorkspace(true)
         setTimeout(() => setPromptPhase(1), 200)
         setTimeout(() => setPromptPhase(2), 600)
-        setTimeout(() => setPromptPhase(3), 1000)
       }, 300)
       return () => clearTimeout(timer)
     }
@@ -182,29 +247,21 @@ export default function AIWorkspace() {
         setIsStreaming(false)
         onComplete()
       }
-    }, 18)
+    }, 25)
     
     return () => clearInterval(interval)
   }, [])
 
-  // Progressive message reveal
+  // Progressive message reveal - now much faster
   useEffect(() => {
     if (hasSubmitted && currentThinkingIndex < thinkingSequence.length) {
       const currentMessage = thinkingSequence[currentThinkingIndex]
-      
-      if (currentMessage.type === "ai-thinking") {
-        setMessages(prev => [...prev, currentMessage])
-        const timer = setTimeout(() => {
-          setCurrentThinkingIndex(prev => prev + 1)
-        }, 1200)
-        return () => clearTimeout(timer)
-      }
       
       const cleanup = streamText(currentMessage.content, () => {
         setMessages(prev => [...prev, currentMessage])
         setStreamedContent("")
         
-        const delay = currentMessage.type === "ai-insight" ? 2000 : 1500
+        const delay = 800 // Fast transition
         const timer = setTimeout(() => {
           setCurrentThinkingIndex(prev => prev + 1)
         }, delay)
@@ -215,13 +272,14 @@ export default function AIWorkspace() {
       return cleanup
     }
     
+    // Show exploration immediately after 2 messages
     if (hasSubmitted && currentThinkingIndex >= thinkingSequence.length && !showExploration) {
       const timer = setTimeout(() => {
         setShowExploration(true)
-        setTimeout(() => setExplorationPhase(1), 300)
-        setTimeout(() => setExplorationPhase(2), 800)
-        setTimeout(() => setExplorationPhase(3), 1400)
-      }, 500)
+        setTimeout(() => setExplorationPhase(1), 200)
+        setTimeout(() => setExplorationPhase(2), 500)
+        setTimeout(() => setExplorationPhase(3), 900)
+      }, 300)
       return () => clearTimeout(timer)
     }
   }, [hasSubmitted, currentThinkingIndex, streamText, showExploration])
@@ -251,14 +309,36 @@ export default function AIWorkspace() {
     }
   }
 
-  const handleSemanticChange = (controlId: string, value: number) => {
-    setSemanticControls(prev => prev.map(c =>
-      c.id === controlId ? { ...c, value } : c
-    ))
+  const handleFragmentChange = (fragmentId: string, newText: string) => {
+    const currentFragments = getCurrentFragments()
+    const updatedFragments = currentFragments.map(f => 
+      f.id === fragmentId ? { ...f, text: newText, alternatives: getAlternativesForFragment(newText) } : f
+    )
+    
+    const newVersionId = `v${promptVersions.length + 1}`
+    const changedFragment = currentFragments.find(f => f.id === fragmentId)
+    
+    setPromptVersions(prev => [...prev, {
+      id: newVersionId,
+      label: `${changedFragment?.text} → ${newText}`,
+      fragments: updatedFragments,
+      timestamp: "Just now"
+    }])
+    
+    setActiveVersion(newVersionId)
+    setExpandedFragment(null)
+    setRecentlyChanged(fragmentId)
+    setTimeout(() => setRecentlyChanged(null), 1500)
+  }
+
+  const handleReturnToExploration = () => {
+    setSelectedDirection(null)
+    setPromptVersions([])
+    setActiveVersion(null)
   }
 
   const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(getCurrentPrompt())
+    navigator.clipboard.writeText(getPromptString())
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -277,9 +357,6 @@ export default function AIWorkspace() {
         {showExploration && (
           <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] bg-chart-3/[0.02] rounded-full blur-[100px] animate-fade-in" />
         )}
-        {showPromptWorkspace && (
-          <div className="absolute bottom-1/4 right-1/6 w-[400px] h-[400px] bg-chart-4/[0.02] rounded-full blur-[100px] animate-fade-in" />
-        )}
       </div>
 
       {/* Left Panel - Conversation */}
@@ -287,9 +364,9 @@ export default function AIWorkspace() {
         className={cn(
           "h-screen flex flex-col border-r border-border/30 relative transition-all duration-700 ease-out",
           showPromptWorkspace 
-            ? "w-[28%] min-w-[320px] max-w-[380px]" 
+            ? "w-[24%] min-w-[280px] max-w-[320px]" 
             : showExploration 
-              ? "w-[40%] min-w-[380px] max-w-[480px]" 
+              ? "w-[32%] min-w-[320px] max-w-[400px]" 
               : "w-[40%] min-w-[400px] max-w-[600px]"
         )}
       >
@@ -300,8 +377,8 @@ export default function AIWorkspace() {
               <Sparkles className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h1 className="text-sm font-medium text-foreground">AIONE Prompt Agent</h1>
-              <p className="text-xs text-muted-foreground">Collaborative exploration</p>
+              <h1 className="text-sm font-medium text-foreground">AIONE</h1>
+              <p className="text-xs text-muted-foreground">Prompt Agent</p>
             </div>
           </div>
         </div>
@@ -312,7 +389,7 @@ export default function AIWorkspace() {
             <div className="h-full flex flex-col justify-center">
               <div className="space-y-4">
                 <p className="text-muted-foreground/80 text-sm leading-relaxed">
-                  Describe what you want to create. Be as vague or specific as you like.
+                  Describe what you want to create.
                 </p>
                 <p className="text-muted-foreground/50 text-xs">
                   Try: &quot;A moody portrait in rain, city lights, contemplative figure&quot;
@@ -325,43 +402,34 @@ export default function AIWorkspace() {
                 <MessageBubble key={message.id} message={message} />
               ))}
               
-              {isStreaming && currentThinkingMessage && currentThinkingMessage.type !== "ai-thinking" && (
+              {isStreaming && currentThinkingMessage && (
                 <div className="flex items-start gap-3">
-                  <MessageIndicator type={currentThinkingMessage.type} />
                   <div className={cn(
-                    "flex-1 text-sm leading-relaxed",
-                    currentThinkingMessage.type === "ai-observation" && "text-foreground/90",
-                    currentThinkingMessage.type === "ai-insight" && "text-foreground"
+                    "w-5 h-5 rounded-full flex items-center justify-center",
+                    currentThinkingMessage.type === "ai-insight" 
+                      ? "bg-primary/20" 
+                      : "bg-chart-4/20"
                   )}>
+                    <div className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      currentThinkingMessage.type === "ai-insight"
+                        ? "bg-primary"
+                        : "bg-chart-4"
+                    )} />
+                  </div>
+                  <div className="flex-1 text-sm leading-relaxed text-foreground/90">
                     {streamedContent}
                     <span className="inline-block w-0.5 h-4 bg-primary/60 ml-0.5 animate-blink" />
                   </div>
                 </div>
               )}
               
-              {currentThinkingMessage?.type === "ai-thinking" && (
-                <div className="flex items-start gap-3 animate-fade-in">
-                  <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground/70 italic">
-                      {currentThinkingMessage.content}
-                    </span>
-                    <ThinkingDots />
-                  </div>
-                </div>
-              )}
-              
               {analysisComplete && (
-                <div className="flex items-start gap-3 animate-fade-in pt-2">
-                  <div className="w-5 h-5 rounded-full bg-chart-4/20 flex items-center justify-center">
-                    <Check className="w-3 h-3 text-chart-4" />
-                  </div>
-                  <span className="text-sm text-chart-4/80">
+                <div className="pt-2 animate-fade-in">
+                  <span className="text-xs text-muted-foreground/60">
                     {selectedDirection 
-                      ? "Direction selected. Refine your prompt on the right."
-                      : "Analysis complete. Explore directions to the right."
+                      ? "Refining prompt..."
+                      : "Select a direction to continue."
                     }
                   </span>
                 </div>
@@ -419,12 +487,12 @@ export default function AIWorkspace() {
         className={cn(
           "h-screen overflow-y-auto scrollbar-hide border-r border-border/30 transition-all duration-700",
           showExploration ? "opacity-100" : "opacity-0 pointer-events-none",
-          showPromptWorkspace ? "w-[36%] min-w-[400px]" : "flex-1"
+          showPromptWorkspace ? "w-[36%] min-w-[380px]" : "flex-1"
         )}
       >
         <div className={cn(
-          "p-8 space-y-8",
-          showPromptWorkspace ? "max-w-xl" : "max-w-2xl mx-auto"
+          "p-8 space-y-6",
+          showPromptWorkspace ? "max-w-lg" : "max-w-xl mx-auto"
         )}>
           
           {/* Section Header */}
@@ -434,102 +502,73 @@ export default function AIWorkspace() {
               explorationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <h2 className="text-lg font-medium text-foreground mb-1">Exploration Workspace</h2>
-            <p className="text-sm text-muted-foreground">Refine dimensions and choose a creative direction</p>
+            <h2 className="text-base font-medium text-foreground mb-1">Explore</h2>
+            <p className="text-xs text-muted-foreground">Choose a creative direction</p>
           </div>
 
-          {/* Detected Themes */}
+          {/* Detected Themes - Compact */}
           <div 
             className={cn(
-              "space-y-3 transition-all duration-500",
-              explorationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              "flex flex-wrap gap-1.5 transition-all duration-500",
+              explorationPhase >= 1 ? "opacity-100" : "opacity-0"
             )}
-            style={{ transitionDelay: "100ms" }}
           >
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Detected Themes
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {detectedThemes.map((theme, index) => (
-                <span
-                  key={theme}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20 transition-all duration-300",
-                    explorationPhase >= 1 ? "opacity-100 scale-100" : "opacity-0 scale-95"
-                  )}
-                  style={{ transitionDelay: `${200 + index * 80}ms` }}
-                >
-                  {theme}
-                </span>
-              ))}
-            </div>
+            {detectedThemes.map((theme, index) => (
+              <span
+                key={theme}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-[11px] bg-muted/40 text-muted-foreground border border-border/30 transition-all",
+                  explorationPhase >= 1 ? "opacity-100" : "opacity-0"
+                )}
+                style={{ transitionDelay: `${100 + index * 50}ms` }}
+              >
+                {theme}
+              </span>
+            ))}
+            {emotionalSignals.slice(0, 2).map((signal, index) => (
+              <span
+                key={signal}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-[11px] bg-chart-5/10 text-chart-5/70 border border-chart-5/20 transition-all",
+                  explorationPhase >= 1 ? "opacity-100" : "opacity-0"
+                )}
+                style={{ transitionDelay: `${300 + index * 50}ms` }}
+              >
+                {signal}
+              </span>
+            ))}
           </div>
 
-          {/* Emotional Signals */}
+          {/* Missing Dimensions - Compact */}
           <div 
             className={cn(
-              "space-y-3 transition-all duration-500",
-              explorationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            )}
-            style={{ transitionDelay: "300ms" }}
-          >
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Emotional Signals
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {emotionalSignals.map((signal, index) => (
-                <span
-                  key={signal}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs bg-chart-5/10 text-chart-5 border border-chart-5/20 transition-all duration-300",
-                    explorationPhase >= 1 ? "opacity-100 scale-100" : "opacity-0 scale-95"
-                  )}
-                  style={{ transitionDelay: `${500 + index * 80}ms` }}
-                >
-                  {signal}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Missing Dimensions */}
-          <div 
-            className={cn(
-              "space-y-3 transition-all duration-500",
+              "transition-all duration-500",
               explorationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
-            style={{ transitionDelay: "100ms" }}
           >
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Refine Dimensions
-              </h3>
-              <Sparkles className="w-3 h-3 text-primary animate-pulse" />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {dimensions.map((dimension, index) => (
                 <div 
                   key={dimension.id}
                   className={cn(
                     "transition-all duration-300",
-                    explorationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+                    explorationPhase >= 2 ? "opacity-100" : "opacity-0"
                   )}
-                  style={{ transitionDelay: `${200 + index * 100}ms` }}
+                  style={{ transitionDelay: `${index * 60}ms` }}
                 >
                   <button
                     onClick={() => setExpandedDimension(expandedDimension === dimension.id ? null : dimension.id)}
                     className={cn(
-                      "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all",
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all",
                       "border",
                       dimension.selectedOption
                         ? "bg-primary/10 border-primary/30 text-foreground"
-                        : "bg-muted/30 border-border/50 text-muted-foreground hover:border-primary/30 hover:bg-muted/40 hover:text-foreground"
+                        : "bg-muted/20 border-border/40 text-muted-foreground hover:border-primary/20 hover:text-foreground"
                     )}
                   >
                     <span className={cn(
                       "transition-colors",
-                      dimension.selectedOption ? "text-primary" : "text-muted-foreground"
+                      dimension.selectedOption ? "text-primary" : "text-muted-foreground/60"
                     )}>
                       {dimension.icon}
                     </span>
@@ -537,30 +576,28 @@ export default function AIWorkspace() {
                       {dimension.selectedOption || dimension.label}
                     </span>
                     <ChevronDown className={cn(
-                      "w-4 h-4 transition-transform flex-shrink-0",
+                      "w-3 h-3 transition-transform flex-shrink-0",
                       expandedDimension === dimension.id && "rotate-180"
                     )} />
                   </button>
                   
                   {expandedDimension === dimension.id && (
-                    <div className="mt-2 p-2 rounded-xl bg-muted/20 border border-border/30 animate-expand">
-                      <div className="space-y-1">
-                        {dimension.options.map((option) => (
-                          <button
-                            key={option}
-                            onClick={() => handleDimensionSelect(dimension.id, option)}
-                            className={cn(
-                              "w-full px-3 py-2 rounded-lg text-xs text-left transition-all",
-                              "hover:bg-primary/10 hover:text-primary",
-                              dimension.selectedOption === option
-                                ? "bg-primary/15 text-primary"
-                                : "text-muted-foreground"
-                            )}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="mt-1.5 p-1.5 rounded-lg bg-muted/20 border border-border/30 animate-expand">
+                      {dimension.options.map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => handleDimensionSelect(dimension.id, option)}
+                          className={cn(
+                            "w-full px-2.5 py-1.5 rounded text-[11px] text-left transition-all",
+                            "hover:bg-primary/10 hover:text-primary",
+                            dimension.selectedOption === option
+                              ? "bg-primary/10 text-primary"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          {option}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -568,100 +605,89 @@ export default function AIWorkspace() {
             </div>
           </div>
 
-          {/* Direction Cards */}
+          {/* Direction Cards with Visual Previews */}
           <div 
             className={cn(
-              "space-y-4 transition-all duration-500",
+              "space-y-3 transition-all duration-500",
               explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
-            style={{ transitionDelay: "100ms" }}
           >
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Creative Directions
-            </h3>
-            
-            <div className="space-y-3">
-              {directions.map((direction, index) => {
-                const isSelected = selectedDirection === direction.id
-                const isDimmed = selectedDirection && !isSelected
+            {directions.map((direction, index) => {
+              const isSelected = selectedDirection === direction.id
+              const isDimmed = selectedDirection && !isSelected
 
-                return (
-                  <button
-                    key={direction.id}
-                    onClick={() => handleDirectionSelect(direction.id)}
-                    className={cn(
-                      "w-full text-left rounded-2xl transition-all duration-500",
-                      "border",
-                      explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
-                      isSelected && "bg-gradient-to-br from-primary/15 to-primary/5 border-primary/40 scale-[1.02] shadow-lg shadow-primary/10 p-6",
-                      isDimmed && "opacity-40 scale-[0.97] p-4",
-                      !isSelected && !isDimmed && "bg-muted/20 border-border/40 hover:bg-muted/40 hover:border-border/60 p-5"
+              return (
+                <button
+                  key={direction.id}
+                  onClick={() => handleDirectionSelect(direction.id)}
+                  className={cn(
+                    "w-full text-left rounded-2xl transition-all duration-500 overflow-hidden",
+                    "border group",
+                    explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
+                    isSelected && "border-primary/50 scale-[1.02] shadow-lg shadow-primary/10",
+                    isDimmed && "opacity-30 scale-[0.97] saturate-50",
+                    !isSelected && !isDimmed && "border-border/40 hover:border-primary/30"
+                  )}
+                  style={{ transitionDelay: `${index * 80}ms` }}
+                >
+                  {/* Visual Preview */}
+                  <div className={cn(
+                    "h-20 relative overflow-hidden transition-all duration-500",
+                    `bg-gradient-to-br ${direction.previewGradient}`,
+                    isSelected && "h-24"
+                  )}>
+                    {/* Atmospheric overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
+                    
+                    {/* Mood elements */}
+                    <div className={cn(
+                      "absolute inset-0 opacity-30",
+                      direction.previewAccent === "cyan" && "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan-400/20 via-transparent to-transparent",
+                      direction.previewAccent === "amber" && "bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-amber-400/20 via-transparent to-transparent",
+                      direction.previewAccent === "slate" && "bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-400/10 via-transparent to-transparent"
+                    )} />
+                    
+                    {/* Selection indicator */}
+                    {isSelected && (
+                      <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary flex items-center justify-center animate-scale-in">
+                        <Check className="w-3.5 h-3.5 text-primary-foreground" />
+                      </div>
                     )}
-                    style={{ transitionDelay: `${200 + index * 120}ms` }}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <h4 className={cn(
-                            "font-medium transition-colors",
-                            isSelected ? "text-primary" : "text-foreground"
-                          )}>
-                            {direction.title}
-                          </h4>
-                          {isSelected && (
-                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center animate-scale-in">
-                              <Check className="w-3 h-3 text-primary-foreground" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <div className="w-14 h-1 rounded-full bg-muted/50 overflow-hidden">
-                            <div 
-                              className={cn(
-                                "h-full rounded-full transition-all",
-                                isSelected ? "bg-primary" : "bg-muted-foreground/30"
-                              )}
-                              style={{ width: `${direction.confidence * 100}%` }}
-                            />
-                          </div>
-                          <span className={cn(
-                            "text-[10px] tabular-nums",
-                            isSelected ? "text-primary" : "text-muted-foreground"
-                          )}>
-                            {Math.round(direction.confidence * 100)}%
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <p className={cn(
-                        "text-sm leading-relaxed transition-colors",
-                        isSelected ? "text-foreground/80" : "text-muted-foreground",
-                        isDimmed && "line-clamp-2"
+                  </div>
+                  
+                  {/* Content */}
+                  <div className={cn(
+                    "p-4 space-y-2 transition-all",
+                    isSelected && "p-5"
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <h4 className={cn(
+                        "font-medium text-sm transition-colors",
+                        isSelected ? "text-primary" : "text-foreground"
                       )}>
-                        {direction.description}
-                      </p>
-                      
-                      <div className="flex gap-1.5">
-                        {direction.moodTags.map((tag) => (
-                          <span
-                            key={tag}
-                            className={cn(
-                              "px-2 py-0.5 rounded text-[10px] uppercase tracking-wider transition-colors",
-                              isSelected
-                                ? "bg-primary/20 text-primary"
-                                : "bg-muted/50 text-muted-foreground"
-                            )}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
+                        {direction.title}
+                      </h4>
+                      <span className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full transition-colors",
+                        isSelected 
+                          ? "bg-primary/20 text-primary" 
+                          : "bg-muted/50 text-muted-foreground"
+                      )}>
+                        {direction.alignmentLabel}
+                      </span>
                     </div>
-                  </button>
-                )
-              })}
-            </div>
+                    
+                    <p className={cn(
+                      "text-xs leading-relaxed transition-colors",
+                      isSelected ? "text-foreground/70" : "text-muted-foreground",
+                      isDimmed && "line-clamp-1"
+                    )}>
+                      {direction.description}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
           </div>
 
         </div>
@@ -672,205 +698,185 @@ export default function AIWorkspace() {
         className={cn(
           "h-screen overflow-y-auto scrollbar-hide transition-all duration-700 ease-out",
           showPromptWorkspace 
-            ? "w-[36%] min-w-[400px] opacity-100 translate-x-0" 
+            ? "w-[40%] min-w-[420px] opacity-100 translate-x-0" 
             : "w-0 opacity-0 translate-x-8 pointer-events-none"
         )}
       >
         <div className="p-8 space-y-6">
           
-          {/* Header */}
+          {/* Header with back button */}
+          <div 
+            className={cn(
+              "flex items-center justify-between transition-all duration-500",
+              promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            )}
+          >
+            <div>
+              <h2 className="text-base font-medium text-foreground mb-0.5">Prompt</h2>
+              <p className="text-xs text-muted-foreground">Click highlighted text to refine</p>
+            </div>
+            <button
+              onClick={handleReturnToExploration}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Back
+            </button>
+          </div>
+
+          {/* Interactive Prompt - The Main Steering Interface */}
           <div 
             className={cn(
               "transition-all duration-500",
               promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <h2 className="text-lg font-medium text-foreground mb-1">Prompt Workspace</h2>
-            <p className="text-sm text-muted-foreground">Refine and evolve your prompt</p>
-          </div>
-
-          {/* Current Working Prompt */}
-          <div 
-            className={cn(
-              "space-y-3 transition-all duration-500",
-              promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            )}
-            style={{ transitionDelay: "100ms" }}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Working Prompt
-              </h3>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={handleCopyPrompt}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                >
-                  {copied ? <Check className="w-3 h-3 text-chart-4" /> : <Copy className="w-3 h-3" />}
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-            </div>
-            
-            <div className="relative rounded-2xl bg-muted/20 border border-border/40 p-5 group">
-              <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                {getCurrentPrompt().split(' ').map((word, i) => {
-                  // Highlight certain key phrases as "diffs"
-                  const highlightWords = ['cyan', 'magenta', 'neon', 'silhouette', 'Blade Runner', 'Cinematic', '8K']
-                  const shouldHighlight = highlightWords.some(hw => word.toLowerCase().includes(hw.toLowerCase()))
+            <div className="relative rounded-2xl bg-muted/10 border border-border/30 p-6 group">
+              <p className="text-sm leading-[1.8] text-foreground/90">
+                {getCurrentFragments().map((fragment) => {
+                  if (!fragment.isEditable) {
+                    return <span key={fragment.id}>{fragment.text}</span>
+                  }
+                  
+                  const isHovered = hoveredFragment === fragment.id
+                  const isExpanded = expandedFragment === fragment.id
+                  const wasChanged = recentlyChanged === fragment.id
                   
                   return (
-                    <span key={i}>
-                      {shouldHighlight ? (
-                        <span className="diff-add">{word}</span>
-                      ) : (
-                        word
+                    <span key={fragment.id} className="relative inline">
+                      <button
+                        onMouseEnter={() => setHoveredFragment(fragment.id)}
+                        onMouseLeave={() => !isExpanded && setHoveredFragment(null)}
+                        onClick={() => setExpandedFragment(isExpanded ? null : fragment.id)}
+                        className={cn(
+                          "relative px-1 -mx-0.5 rounded transition-all duration-300",
+                          "hover:bg-primary/15",
+                          isHovered && "bg-primary/10",
+                          isExpanded && "bg-primary/20 ring-1 ring-primary/40",
+                          wasChanged && "animate-pulse bg-chart-4/20"
+                        )}
+                      >
+                        <span className={cn(
+                          "transition-colors duration-300",
+                          isHovered || isExpanded ? "text-primary" : "text-foreground"
+                        )}>
+                          {fragment.text}
+                        </span>
+                        
+                        {/* Subtle underline indicator */}
+                        <span className={cn(
+                          "absolute bottom-0 left-1 right-1 h-px bg-primary/40 transition-opacity",
+                          isHovered || isExpanded ? "opacity-100" : "opacity-0"
+                        )} />
+                      </button>
+                      
+                      {/* Semantic alternatives dropdown */}
+                      {isExpanded && fragment.alternatives && (
+                        <span className="absolute z-10 left-0 top-full mt-2 animate-expand">
+                          <span className="flex flex-col gap-0.5 p-2 rounded-xl bg-card border border-border/50 shadow-xl min-w-[180px]">
+                            <span className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">
+                              Alternatives
+                            </span>
+                            {fragment.alternatives.map((alt) => (
+                              <button
+                                key={alt}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleFragmentChange(fragment.id, alt)
+                                }}
+                                className={cn(
+                                  "px-3 py-2 rounded-lg text-xs text-left transition-all",
+                                  "hover:bg-primary/10 hover:text-primary",
+                                  "text-muted-foreground"
+                                )}
+                              >
+                                {alt}
+                              </button>
+                            ))}
+                          </span>
+                        </span>
                       )}
-                      {' '}
                     </span>
                   )
                 })}
               </p>
               
-              {/* Subtle glow on hover */}
-              <div className="absolute inset-0 rounded-2xl bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              {/* Copy button */}
+              <div className="absolute top-4 right-4">
+                <button 
+                  onClick={handleCopyPrompt}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  {copied ? <Check className="w-3 h-3 text-chart-4" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Version History */}
+          {/* Version History - Timeline Style */}
           <div 
             className={cn(
               "space-y-3 transition-all duration-500",
               promptPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
-            style={{ transitionDelay: "100ms" }}
           >
             <div className="flex items-center gap-2">
-              <Clock className="w-3 h-3 text-muted-foreground" />
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Version History
+              <Clock className="w-3 h-3 text-muted-foreground/60" />
+              <h3 className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
+                Evolution
               </h3>
             </div>
             
-            <div className="space-y-2">
-              {promptVersions.map((version, index) => (
-                <button
-                  key={version.id}
-                  onClick={() => setActiveVersion(version.id)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all",
-                    "border",
-                    activeVersion === version.id
-                      ? "bg-primary/10 border-primary/30"
-                      : "bg-muted/20 border-border/40 hover:bg-muted/30 hover:border-border/60"
-                  )}
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className={cn(
-                    "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium",
-                    activeVersion === version.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  )}>
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-sm font-medium",
-                        activeVersion === version.id ? "text-primary" : "text-foreground"
-                      )}>
-                        Version {index + 1}
+            <div className="relative pl-4 border-l border-border/30 space-y-3">
+              {promptVersions.map((version, index) => {
+                const isActive = activeVersion === version.id
+                const isLatest = index === promptVersions.length - 1
+                
+                return (
+                  <button
+                    key={version.id}
+                    onClick={() => setActiveVersion(version.id)}
+                    className={cn(
+                      "relative w-full text-left pl-4 py-2 rounded-r-lg transition-all",
+                      isActive 
+                        ? "bg-primary/5" 
+                        : "hover:bg-muted/20"
+                    )}
+                  >
+                    {/* Timeline dot */}
+                    <div className={cn(
+                      "absolute -left-[21px] top-3 w-3 h-3 rounded-full border-2 transition-colors",
+                      isActive 
+                        ? "bg-primary border-primary" 
+                        : "bg-background border-border/50"
+                    )} />
+                    
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "text-xs font-medium",
+                            isActive ? "text-primary" : "text-foreground/70"
+                          )}>
+                            V{index + 1}
+                          </span>
+                          {isLatest && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/20 text-primary">
+                              Latest
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {version.label}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
+                        {version.timestamp}
                       </span>
-                      <span className="text-xs text-muted-foreground">{version.timestamp}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {version.changes[0]}
-                    </p>
-                  </div>
-                  {activeVersion === version.id && (
-                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                  )}
-                </button>
-              ))}
-              
-              {/* Add version hint */}
-              <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground/50">
-                <RotateCcw className="w-3 h-3" />
-                <span>Adjust controls below to create new versions</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Semantic Refinement Controls */}
-          <div 
-            className={cn(
-              "space-y-4 transition-all duration-500",
-              promptPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            )}
-            style={{ transitionDelay: "100ms" }}
-          >
-            <div className="flex items-center gap-2">
-              <Sliders className="w-3 h-3 text-muted-foreground" />
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Semantic Controls
-              </h3>
-            </div>
-            
-            <div className="space-y-5 p-5 rounded-2xl bg-muted/10 border border-border/30">
-              {semanticControls.map((control, index) => (
-                <div 
-                  key={control.id} 
-                  className={cn(
-                    "space-y-2 transition-all duration-300",
-                    promptPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-                  )}
-                  style={{ transitionDelay: `${200 + index * 100}ms` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-foreground">{control.label}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {control.value}%
-                    </span>
-                  </div>
-                  
-                  <div className="relative">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={control.value}
-                      onChange={(e) => handleSemanticChange(control.id, parseInt(e.target.value))}
-                      className="w-full h-1.5 bg-muted/50 rounded-full appearance-none cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none
-                        [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4
-                        [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-primary
-                        [&::-webkit-slider-thumb]:shadow-lg
-                        [&::-webkit-slider-thumb]:shadow-primary/30
-                        [&::-webkit-slider-thumb]:cursor-pointer
-                        [&::-webkit-slider-thumb]:transition-transform
-                        [&::-webkit-slider-thumb]:hover:scale-110
-                        [&::-moz-range-thumb]:appearance-none
-                        [&::-moz-range-thumb]:w-4
-                        [&::-moz-range-thumb]:h-4
-                        [&::-moz-range-thumb]:rounded-full
-                        [&::-moz-range-thumb]:bg-primary
-                        [&::-moz-range-thumb]:border-0
-                        [&::-moz-range-thumb]:cursor-pointer"
-                      style={{
-                        background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${control.value}%, var(--muted) ${control.value}%, var(--muted) 100%)`
-                      }}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                    <span>{control.leftLabel}</span>
-                    <span>{control.rightLabel}</span>
-                  </div>
-                </div>
-              ))}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -891,53 +897,20 @@ function MessageBubble({ message }: { message: Message }) {
     )
   }
 
-  if (message.type === "ai-thinking") {
-    return (
-      <div className="flex items-start gap-3 animate-fade-in opacity-50">
-        <div className="w-5 h-5 rounded-full bg-muted/50 flex items-center justify-center">
-          <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
-        </div>
-        <span className="text-sm text-muted-foreground/60 italic">{message.content}</span>
-      </div>
-    )
-  }
-
   return (
     <div className="flex items-start gap-3 animate-fade-in">
-      <MessageIndicator type={message.type} />
       <div className={cn(
-        "flex-1 text-sm leading-relaxed",
-        message.type === "ai-observation" && "text-foreground/90",
-        message.type === "ai-insight" && "text-foreground"
+        "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
+        message.type === "ai-insight" ? "bg-primary/20" : "bg-chart-4/20"
       )}>
-        {message.content}
+        <div className={cn(
+          "w-1.5 h-1.5 rounded-full",
+          message.type === "ai-insight" ? "bg-primary" : "bg-chart-4"
+        )} />
       </div>
+      <span className="text-sm leading-relaxed text-foreground/90">
+        {message.content}
+      </span>
     </div>
-  )
-}
-
-function MessageIndicator({ type }: { type: string }) {
-  return (
-    <div className={cn(
-      "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
-      type === "ai-observation" && "bg-chart-3/15",
-      type === "ai-insight" && "bg-chart-4/15"
-    )}>
-      <div className={cn(
-        "w-1.5 h-1.5 rounded-full",
-        type === "ai-observation" && "bg-chart-3/70",
-        type === "ai-insight" && "bg-chart-4/70"
-      )} />
-    </div>
-  )
-}
-
-function ThinkingDots() {
-  return (
-    <span className="flex gap-1">
-      <span className="w-1 h-1 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0ms' }} />
-      <span className="w-1 h-1 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '150ms' }} />
-      <span className="w-1 h-1 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '300ms' }} />
-    </span>
   )
 }
