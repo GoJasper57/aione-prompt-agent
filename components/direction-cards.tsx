@@ -1,9 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
-import { Check, Sparkles } from "lucide-react"
-import { SkeletonCard } from "./loading-states"
+import { Check } from "lucide-react"
 
 export interface Direction {
   id: string
@@ -13,98 +11,6 @@ export interface Direction {
   confidence: number
 }
 
-interface DirectionCardProps {
-  direction: Direction
-  isSelected: boolean
-  onSelect: () => void
-}
-
-function DirectionCard({ direction, isSelected, onSelect }: DirectionCardProps) {
-  return (
-    <button
-      onClick={onSelect}
-      className={cn(
-        "relative w-full text-left rounded-2xl border p-5 transition-all duration-300",
-        "hover:translate-y-[-2px]",
-        isSelected 
-          ? "border-primary/50 bg-primary/5 glow-accent" 
-          : "border-border/50 bg-card/30 hover:border-border hover:bg-card/50"
-      )}
-    >
-      {/* Selection indicator */}
-      {isSelected && (
-        <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-          <Check className="w-3 h-3 text-primary-foreground" />
-        </div>
-      )}
-
-      {/* Preview placeholder */}
-      <div className={cn(
-        "h-24 rounded-xl mb-4 flex items-center justify-center",
-        "bg-gradient-to-br from-secondary/50 to-secondary/20",
-        "border border-border/30"
-      )}>
-        <div className={cn(
-          "w-10 h-10 rounded-lg flex items-center justify-center",
-          "bg-primary/10"
-        )}>
-          <Sparkles className={cn(
-            "w-5 h-5",
-            isSelected ? "text-primary" : "text-muted-foreground"
-          )} />
-        </div>
-      </div>
-
-      {/* Content */}
-      <h4 className={cn(
-        "font-semibold mb-2 transition-colors",
-        isSelected ? "text-foreground" : "text-foreground/80"
-      )}>
-        {direction.title}
-      </h4>
-      
-      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-        {direction.description}
-      </p>
-
-      {/* Tags and Confidence */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {direction.moodTags.slice(0, 2).map((tag) => (
-            <Badge 
-              key={tag}
-              variant="secondary"
-              className="rounded-md bg-secondary/50 text-secondary-foreground/70 border-0 text-[10px] px-2 py-0.5"
-            >
-              {tag}
-            </Badge>
-          ))}
-        </div>
-        
-        {/* Confidence indicator */}
-        <div className="flex items-center gap-1.5">
-          <div className="flex gap-0.5">
-            {[1, 2, 3, 4, 5].map((level) => (
-              <div
-                key={level}
-                className={cn(
-                  "w-1 h-3 rounded-full transition-colors",
-                  level <= Math.round(direction.confidence * 5)
-                    ? "bg-primary"
-                    : "bg-border"
-                )}
-              />
-            ))}
-          </div>
-          <span className="text-[10px] text-muted-foreground">
-            {Math.round(direction.confidence * 100)}%
-          </span>
-        </div>
-      </div>
-    </button>
-  )
-}
-
 interface DirectionCardsProps {
   directions: Direction[]
   selectedId: string | null
@@ -112,21 +18,20 @@ interface DirectionCardsProps {
   isLoading: boolean
 }
 
-export function DirectionCards({ 
-  directions, 
-  selectedId, 
-  onSelect, 
-  isLoading 
-}: DirectionCardsProps) {
+export function DirectionCards({ directions, selectedId, onSelect, isLoading }: DirectionCardsProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">Possible Creative Directions</h3>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} />
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Exploring Directions
+        </h3>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-28 rounded-2xl animate-shimmer"
+              style={{ animationDelay: `${i * 0.1}s` }}
+            />
           ))}
         </div>
       </div>
@@ -135,36 +40,109 @@ export function DirectionCards({
 
   if (directions.length === 0) {
     return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-foreground">Possible Creative Directions</h3>
-        <div className="rounded-2xl border border-border/30 border-dashed bg-card/20 p-12 text-center">
-          <Sparkles className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">
-            Directions will appear here after analysis
-          </p>
-        </div>
+      <div className="flex items-center justify-center py-12 text-muted-foreground/50 text-sm">
+        Directions will appear here...
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">Possible Creative Directions</h3>
-        <span className="text-xs text-muted-foreground">
-          {directions.length} directions found
-        </span>
-      </div>
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        Creative Directions
+      </h3>
       
-      <div className="grid grid-cols-2 gap-4">
-        {directions.map((direction) => (
-          <DirectionCard
-            key={direction.id}
-            direction={direction}
-            isSelected={selectedId === direction.id}
-            onSelect={() => onSelect(direction.id)}
-          />
-        ))}
+      <div className="space-y-3">
+        {directions.map((direction, index) => {
+          const isSelected = selectedId === direction.id
+          const isDimmed = selectedId && !isSelected
+
+          return (
+            <button
+              key={direction.id}
+              onClick={() => onSelect(direction.id)}
+              className={cn(
+                "w-full text-left rounded-2xl p-5 transition-all duration-500",
+                "border",
+                "animate-fade-in opacity-0",
+                isSelected && [
+                  "bg-gradient-to-br from-primary/15 to-primary/5",
+                  "border-primary/40",
+                  "glow-subtle",
+                  "scale-[1.02]"
+                ],
+                isDimmed && "dim-inactive",
+                !isSelected && !isDimmed && [
+                  "bg-muted/20 border-border/40",
+                  "hover:bg-muted/40 hover:border-border/60"
+                ]
+              )}
+              style={{ animationDelay: `${index * 0.15}s` }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className={cn(
+                      "font-medium transition-colors",
+                      isSelected ? "text-primary" : "text-foreground"
+                    )}>
+                      {direction.title}
+                    </h4>
+                    {isSelected && (
+                      <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center animate-expand opacity-0">
+                        <Check className="w-3 h-3 text-primary-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className={cn(
+                    "text-sm leading-relaxed transition-colors",
+                    isSelected ? "text-foreground/80" : "text-muted-foreground"
+                  )}>
+                    {direction.description}
+                  </p>
+                  
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="flex gap-1.5">
+                      {direction.moodTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[10px] uppercase tracking-wider transition-colors",
+                            isSelected
+                              ? "bg-primary/20 text-primary"
+                              : "bg-muted/50 text-muted-foreground"
+                          )}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    
+                    {/* Confidence indicator */}
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <div className="w-16 h-1 rounded-full bg-muted/50 overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            isSelected ? "bg-primary" : "bg-muted-foreground/30"
+                          )}
+                          style={{ width: `${direction.confidence * 100}%` }}
+                        />
+                      </div>
+                      <span className={cn(
+                        "text-[10px] tabular-nums",
+                        isSelected ? "text-primary" : "text-muted-foreground"
+                      )}>
+                        {Math.round(direction.confidence * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
