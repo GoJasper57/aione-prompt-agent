@@ -1,356 +1,348 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
-import { IntentInput } from "@/components/intent-input"
-import { ConversationStream } from "@/components/conversation-stream"
-import { ExplorationWorkspace } from "@/components/exploration-workspace"
-import { DirectionCards, type Direction } from "@/components/direction-cards"
-import { PromptEvolution, type PromptVersion } from "@/components/prompt-evolution"
-import { SemanticSteering } from "@/components/semantic-steering"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
+import { Send, Sparkles } from "lucide-react"
 
 // Types
 interface Message {
   id: string
-  type: "user" | "ai-thinking" | "ai-observation" | "ai-question"
+  type: "user" | "ai-thinking" | "ai-observation" | "ai-insight"
   content: string
-  isStreaming?: boolean
 }
 
-interface MissingDimension {
-  id: string
-  label: string
-  options: string[]
-  selectedOption?: string
-}
-
-// Mock data
-const examplePrompt = "A moody portrait of a person standing in rain, looking contemplative, with city lights reflecting off wet surfaces"
-
-const mockDirections: Direction[] = [
+// Realistic AI thinking messages - progressive and thoughtful
+const thinkingSequence: Message[] = [
   {
-    id: "1",
-    title: "Neo-Noir Cinematic",
-    description: "Deep shadows, neon reflections, and a sense of urban isolation. Think Blade Runner meets street photography.",
-    moodTags: ["Dark", "Cinematic", "Urban"],
-    confidence: 0.92
-  },
-  {
-    id: "2",
-    title: "Intimate Documentary",
-    description: "Raw, authentic emotion captured in natural light. Less stylized, more human connection.",
-    moodTags: ["Raw", "Authentic", "Emotional"],
-    confidence: 0.85
-  },
-  {
-    id: "3",
-    title: "Painterly Impressionist",
-    description: "Soft focus, dreamy rain effects, blurred city lights creating an almost abstract quality.",
-    moodTags: ["Artistic", "Dreamy", "Abstract"],
-    confidence: 0.78
-  }
-]
-
-const initialDimensions: MissingDimension[] = [
-  {
-    id: "lighting",
-    label: "Lighting Style",
-    options: ["Neon reflections", "Soft cinematic glow", "Hard contrast shadows", "Overcast realism"]
-  },
-  {
-    id: "camera",
-    label: "Camera Angle",
-    options: ["Low angle dramatic", "Eye level intimate", "High angle vulnerable", "Dutch angle tension"]
-  },
-  {
-    id: "color",
-    label: "Color Language",
-    options: ["Cyan & magenta", "Warm amber tones", "Desaturated moody", "High contrast B&W"]
-  },
-  {
-    id: "mood",
-    label: "Emotional Intensity",
-    options: ["Subtle melancholy", "Deep contemplation", "Quiet strength", "Raw vulnerability"]
-  }
-]
-
-const aiMessages: Message[] = [
-  {
-    id: "1",
+    id: "t1",
     type: "ai-thinking",
-    content: "I'm detecting a cinematic urban mood in your description...",
-    isStreaming: true
+    content: "Parsing your creative intent..."
   },
   {
-    id: "2",
+    id: "t2",
     type: "ai-observation",
-    content: "Your mention of rain and reflections strongly suggests neo-noir aesthetics. The contemplative figure creates a powerful emotional anchor.",
-    isStreaming: true
+    content: "I notice you're describing a mood-driven scene. The rain and city lights suggest an urban noir aesthetic, while the contemplative figure creates emotional depth."
   },
   {
-    id: "3",
+    id: "t3",
     type: "ai-thinking",
-    content: "Several visual directions are emerging. Let me map out the creative possibilities...",
-    isStreaming: true
+    content: "Analyzing visual components..."
   },
   {
-    id: "4",
-    type: "ai-question",
-    content: "To refine further: should the mood lean more melancholic or mysteriously alluring?",
-    isStreaming: true
+    id: "t4",
+    type: "ai-observation",
+    content: "Key elements detected: environmental atmosphere (rain, wet surfaces), lighting conditions (city reflections), subject positioning (standing figure), and emotional tone (contemplative)."
+  },
+  {
+    id: "t5",
+    type: "ai-thinking",
+    content: "Mapping to visual language..."
+  },
+  {
+    id: "t6",
+    type: "ai-insight",
+    content: "This prompt has strong cinematic potential. The interplay between harsh urban environment and human vulnerability creates natural tension. Several interpretive directions are possible."
+  },
+  {
+    id: "t7",
+    type: "ai-thinking",
+    content: "Identifying ambiguities that need resolution..."
+  },
+  {
+    id: "t8",
+    type: "ai-observation",
+    content: "To fully realize this vision, we should clarify: lighting intensity (subtle glow vs dramatic neon), camera perspective (intimate close-up vs environmental wide), and color temperature (cool cyan vs warm amber tones)."
   }
 ]
-
-type Stage = "input" | "exploring" | "directions" | "evolution"
 
 export default function AIWorkspace() {
-  const [stage, setStage] = useState<Stage>("input")
+  const [userInput, setUserInput] = useState("")
+  const [hasSubmitted, setHasSubmitted] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
-  const [isThinking, setIsThinking] = useState(false)
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0)
-  
-  // Exploration state
-  const [detectedThemes, setDetectedThemes] = useState<string[]>([])
-  const [emotionalSignals, setEmotionalSignals] = useState<string[]>([])
-  const [missingDimensions, setMissingDimensions] = useState<MissingDimension[]>([])
-  
-  // Direction state
-  const [directions, setDirections] = useState<Direction[]>([])
-  const [selectedDirection, setSelectedDirection] = useState<string | null>(null)
-  const [isLoadingDirections, setIsLoadingDirections] = useState(false)
-  
-  // Prompt evolution state
-  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
-  const [currentPromptVersion, setCurrentPromptVersion] = useState<PromptVersion | null>(null)
-  const [isStreamingPrompt, setIsStreamingPrompt] = useState(false)
-  
-  // Steering state
-  const [steeringSliders, setSteeringSliders] = useState([
-    { id: "style", leftLabel: "Subtle", rightLabel: "Cinematic", value: 0.7 },
-    { id: "mood", leftLabel: "Grounded", rightLabel: "Dreamlike", value: 0.4 },
-    { id: "finish", leftLabel: "Raw", rightLabel: "Stylized", value: 0.6 }
-  ])
+  const [currentThinkingIndex, setCurrentThinkingIndex] = useState(0)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamedContent, setStreamedContent] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, streamedContent])
+
+  // Stream text character by character
+  const streamText = useCallback((text: string, onComplete: () => void) => {
+    setIsStreaming(true)
+    setStreamedContent("")
+    let index = 0
+    
+    const interval = setInterval(() => {
+      if (index < text.length) {
+        setStreamedContent(text.slice(0, index + 1))
+        index++
+      } else {
+        clearInterval(interval)
+        setIsStreaming(false)
+        onComplete()
+      }
+    }, 18)
+    
+    return () => clearInterval(interval)
+  }, [])
 
   // Progressive message reveal
   useEffect(() => {
-    if (stage === "exploring" && currentMessageIndex < aiMessages.length) {
-      const timer = setTimeout(() => {
-        setMessages(prev => [...prev, aiMessages[currentMessageIndex]])
-        setCurrentMessageIndex(prev => prev + 1)
-        
-        // After second message, show exploration workspace
-        if (currentMessageIndex === 1) {
-          setDetectedThemes(["Urban isolation", "Rain aesthetics", "Cinematic mood", "Contemplation"])
-          setEmotionalSignals(["Melancholy", "Introspection", "Solitude"])
-          setMissingDimensions(initialDimensions)
-        }
-        
-        // After all messages, show directions
-        if (currentMessageIndex === aiMessages.length - 1) {
-          setIsThinking(false)
-          setIsLoadingDirections(true)
-          setTimeout(() => {
-            setDirections(mockDirections)
-            setIsLoadingDirections(false)
-            setStage("directions")
-          }, 1500)
-        }
-      }, 2000)
+    if (hasSubmitted && currentThinkingIndex < thinkingSequence.length) {
+      const currentMessage = thinkingSequence[currentThinkingIndex]
       
-      return () => clearTimeout(timer)
+      // For thinking messages, show briefly then move on
+      if (currentMessage.type === "ai-thinking") {
+        setMessages(prev => [...prev, currentMessage])
+        const timer = setTimeout(() => {
+          setCurrentThinkingIndex(prev => prev + 1)
+        }, 1200)
+        return () => clearTimeout(timer)
+      }
+      
+      // For observations and insights, stream the text
+      const cleanup = streamText(currentMessage.content, () => {
+        setMessages(prev => [...prev, currentMessage])
+        setStreamedContent("")
+        
+        const delay = currentMessage.type === "ai-insight" ? 2000 : 1500
+        const timer = setTimeout(() => {
+          setCurrentThinkingIndex(prev => prev + 1)
+        }, delay)
+        
+        return () => clearTimeout(timer)
+      })
+      
+      return cleanup
     }
-  }, [stage, currentMessageIndex])
+  }, [hasSubmitted, currentThinkingIndex, streamText])
 
-  const handleIntentSubmit = useCallback((intent: string) => {
-    setMessages([{ id: "user-1", type: "user", content: intent }])
-    setStage("exploring")
-    setIsThinking(true)
-    setCurrentMessageIndex(0)
-  }, [])
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
+    if (!userInput.trim() || hasSubmitted) return
+    
+    setMessages([{
+      id: "user-1",
+      type: "user",
+      content: userInput.trim()
+    }])
+    setHasSubmitted(true)
+    setCurrentThinkingIndex(0)
+  }, [userInput, hasSubmitted])
 
-  const handleDimensionSelect = useCallback((dimensionId: string, option: string) => {
-    setMissingDimensions(prev => prev.map(d => 
-      d.id === dimensionId ? { ...d, selectedOption: option } : d
-    ))
-  }, [])
-
-  const handleSelectDirection = useCallback((id: string) => {
-    setSelectedDirection(id)
-    setStage("evolution")
-    setIsStreamingPrompt(true)
-    
-    const selectedDir = mockDirections.find(d => d.id === id)
-    const basePrompt = `Cinematic portrait photography, single figure standing alone in urban rain, contemplative expression, face partially illuminated by neon signs, deep shadows and rich blacks, wet pavement reflecting cyan and magenta city lights, shallow depth of field, bokeh from distant traffic, ${selectedDir?.title.toLowerCase()} aesthetic, 35mm film grain, moody atmosphere, nighttime urban setting, high contrast lighting, photorealistic, detailed skin texture, rain droplets visible on clothing, steam rising from street vents --ar 2:3 --style raw --v 6`
-    
-    const newVersion: PromptVersion = {
-      id: "v1",
-      version: 1,
-      label: `Initial ${selectedDir?.title || "interpretation"}`,
-      content: basePrompt,
-      timestamp: new Date()
-    }
-    
-    setPromptVersions([newVersion])
-    setCurrentPromptVersion(newVersion)
-    
-    setTimeout(() => setIsStreamingPrompt(false), basePrompt.length * 12 + 500)
-  }, [])
-
-  const handleSteeringChange = useCallback((id: string, value: number) => {
-    setSteeringSliders(prev => prev.map(s => 
-      s.id === id ? { ...s, value } : s
-    ))
-  }, [])
-
-  const handleApplyRefinements = useCallback(() => {
-    if (!currentPromptVersion) return
-    
-    setIsStreamingPrompt(true)
-    
-    const additions = []
-    const styleValue = steeringSliders.find(s => s.id === "style")?.value || 0.5
-    const moodValue = steeringSliders.find(s => s.id === "mood")?.value || 0.5
-    
-    if (styleValue > 0.6) additions.push("dramatic cinematic lighting")
-    if (moodValue > 0.5) additions.push("ethereal dreamlike atmosphere")
-    
-    const selectedDims = missingDimensions.filter(d => d.selectedOption)
-    selectedDims.forEach(d => {
-      additions.push(d.selectedOption!.toLowerCase())
-    })
-    
-    const refinedPrompt = currentPromptVersion.content + (additions.length > 0 
-      ? `, ${additions.join(", ")}` 
-      : "")
-    
-    const newVersion: PromptVersion = {
-      id: `v${promptVersions.length + 1}`,
-      version: promptVersions.length + 1,
-      label: "Refined with steering adjustments",
-      content: refinedPrompt,
-      additions,
-      timestamp: new Date()
-    }
-    
-    setPromptVersions(prev => [...prev, newVersion])
-    setCurrentPromptVersion(newVersion)
-    
-    setTimeout(() => setIsStreamingPrompt(false), 2000)
-  }, [currentPromptVersion, promptVersions.length, steeringSliders, missingDimensions])
-
-  const handleCopyPrompt = useCallback(() => {
-    if (currentPromptVersion) {
-      navigator.clipboard.writeText(currentPromptVersion.content)
-    }
-  }, [currentPromptVersion])
-
-  const showExploration = stage !== "input"
-  const showDirections = stage === "directions" || stage === "evolution"
-  const showEvolution = stage === "evolution"
+  const currentThinkingMessage = hasSubmitted && currentThinkingIndex < thinkingSequence.length 
+    ? thinkingSequence[currentThinkingIndex] 
+    : null
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background gradient accents */}
+    <div className="min-h-screen bg-background flex">
+      {/* Subtle background gradient */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/3 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-chart-5/3 rounded-full blur-[100px]" />
+        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-primary/[0.03] rounded-full blur-[100px]" />
       </div>
 
-      {/* Main Content */}
-      <main className="relative h-screen flex">
+      {/* Left Panel - Conversation (40% width) */}
+      <div className="w-[40%] min-w-[400px] max-w-[600px] h-screen flex flex-col border-r border-border/30 relative">
         
-        {/* Stage 1: Conversation / Intent */}
-        <div className={cn(
-          "h-full flex flex-col p-8 transition-all duration-700 ease-out",
-          showExploration ? "w-[380px] border-r border-border/20" : "w-full max-w-2xl mx-auto justify-center"
-        )}>
-          {stage === "input" ? (
-            <div className="max-w-md mx-auto w-full">
-              <IntentInput
-                onSubmit={handleIntentSubmit}
-                isProcessing={false}
-                examplePrompt={examplePrompt}
-              />
-              
-              {/* Tagline */}
-              <p className="mt-8 text-center text-sm text-muted-foreground/60 leading-relaxed">
-                Transform vague creative intent into refined, controllable prompts through collaborative AI exploration.
-              </p>
+        {/* Header */}
+        <div className="px-8 py-6 border-b border-border/20">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-sm font-medium text-foreground">AIONE Prompt Agent</h1>
+              <p className="text-xs text-muted-foreground">Collaborative prompt exploration</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide px-8 py-6">
+          {!hasSubmitted ? (
+            /* Initial State - Centered prompt */
+            <div className="h-full flex flex-col justify-center">
+              <div className="space-y-4">
+                <p className="text-muted-foreground/80 text-sm leading-relaxed">
+                  Describe what you want to create. Be as vague or specific as you like.
+                </p>
+                <p className="text-muted-foreground/50 text-xs">
+                  Try: &quot;A moody portrait of a person standing in rain, looking contemplative, with city lights reflecting off wet surfaces&quot;
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-                </div>
-                <span className="text-sm font-medium text-foreground">Exploring</span>
-              </div>
+            /* Conversation Flow */
+            <div className="space-y-6">
+              {messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
               
-              <ConversationStream
-                messages={messages}
-                isThinking={isThinking}
-              />
+              {/* Currently streaming message */}
+              {isStreaming && currentThinkingMessage && currentThinkingMessage.type !== "ai-thinking" && (
+                <div className="flex items-start gap-3">
+                  <MessageIndicator type={currentThinkingMessage.type} />
+                  <div className={cn(
+                    "flex-1 text-sm leading-relaxed",
+                    currentThinkingMessage.type === "ai-observation" && "text-foreground/90",
+                    currentThinkingMessage.type === "ai-insight" && "text-foreground"
+                  )}>
+                    {streamedContent}
+                    <span className="inline-block w-0.5 h-4 bg-primary/60 ml-0.5 animate-blink" />
+                  </div>
+                </div>
+              )}
+              
+              {/* Thinking indicator */}
+              {currentThinkingMessage?.type === "ai-thinking" && (
+                <div className="flex items-start gap-3 animate-fade-in">
+                  <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground/70 italic">
+                      {currentThinkingMessage.content}
+                    </span>
+                    <ThinkingDots />
+                  </div>
+                </div>
+              )}
+              
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>
 
-        {/* Stage 2: Exploration Workspace */}
-        {showExploration && (
-          <div className={cn(
-            "h-full flex flex-col p-8 transition-all duration-700 ease-out overflow-y-auto scrollbar-hide",
-            showEvolution ? "w-[420px] border-r border-border/20" : "flex-1"
-          )}>
-            <div className="space-y-8">
-              <ExplorationWorkspace
-                detectedThemes={detectedThemes}
-                emotionalSignals={emotionalSignals}
-                missingDimensions={missingDimensions}
-                onDimensionSelect={handleDimensionSelect}
-                isVisible={detectedThemes.length > 0}
+        {/* Input Area */}
+        <div className="px-8 py-6 border-t border-border/20">
+          <form onSubmit={handleSubmit}>
+            <div className={cn(
+              "relative rounded-2xl transition-all duration-300",
+              "bg-muted/30 border border-border/40",
+              "focus-within:border-primary/30 focus-within:bg-muted/40",
+              hasSubmitted && "opacity-50 pointer-events-none"
+            )}>
+              <textarea
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmit(e)
+                  }
+                }}
+                placeholder="Describe your creative vision..."
+                disabled={hasSubmitted}
+                rows={3}
+                className="w-full bg-transparent px-5 py-4 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none resize-none"
               />
-              
-              {showDirections && (
-                <div className={cn(
-                  "transition-all duration-500",
-                  !showEvolution && "max-w-2xl"
-                )}>
-                  <DirectionCards
-                    directions={directions}
-                    selectedId={selectedDirection}
-                    onSelect={handleSelectDirection}
-                    isLoading={isLoadingDirections}
-                  />
-                </div>
-              )}
+              <div className="absolute bottom-3 right-3">
+                <button
+                  type="submit"
+                  disabled={!userInput.trim() || hasSubmitted}
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                    userInput.trim() && !hasSubmitted
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-muted text-muted-foreground/30"
+                  )}
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          </form>
+          
+          {hasSubmitted && (
+            <p className="mt-3 text-xs text-muted-foreground/50 text-center">
+              AI is analyzing your intent...
+            </p>
+          )}
+        </div>
+      </div>
 
-        {/* Stage 3: Prompt Evolution */}
-        {showEvolution && (
-          <div className="flex-1 h-full flex flex-col p-8 overflow-hidden">
-            <div className="flex-1 min-h-0">
-              <PromptEvolution
-                versions={promptVersions}
-                currentVersion={currentPromptVersion}
-                isStreaming={isStreamingPrompt}
-                isVisible={true}
-                onCopy={handleCopyPrompt}
-              />
-            </div>
-            
-            <div className="pt-6 border-t border-border/20 mt-6">
-              <SemanticSteering
-                sliders={steeringSliders}
-                onChange={handleSteeringChange}
-                onApply={handleApplyRefinements}
-                isVisible={true}
-                disabled={isStreamingPrompt}
-              />
-            </div>
+      {/* Right Panel - Empty placeholder for future workspace */}
+      <div className="flex-1 h-screen flex items-center justify-center">
+        <div className="text-center space-y-3 max-w-xs">
+          <div className="w-12 h-12 rounded-2xl bg-muted/30 mx-auto flex items-center justify-center">
+            <div className="w-3 h-3 rounded-full bg-muted-foreground/20" />
           </div>
-        )}
-      </main>
+          <p className="text-sm text-muted-foreground/40">
+            Exploration workspace will appear here
+          </p>
+          <p className="text-xs text-muted-foreground/25">
+            Start by describing what you want to create
+          </p>
+        </div>
+      </div>
     </div>
+  )
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  if (message.type === "user") {
+    return (
+      <div className="flex justify-end animate-fade-in">
+        <div className="max-w-[90%] bg-primary/10 border border-primary/20 rounded-2xl rounded-br-md px-5 py-3">
+          <p className="text-sm text-foreground leading-relaxed">{message.content}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (message.type === "ai-thinking") {
+    return (
+      <div className="flex items-start gap-3 animate-fade-in opacity-60">
+        <div className="w-6 h-6 rounded-full bg-muted/50 flex items-center justify-center">
+          <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
+        </div>
+        <span className="text-sm text-muted-foreground/60 italic">{message.content}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-start gap-3 animate-fade-in">
+      <MessageIndicator type={message.type} />
+      <div className={cn(
+        "flex-1 text-sm leading-relaxed",
+        message.type === "ai-observation" && "text-foreground/90",
+        message.type === "ai-insight" && "text-foreground"
+      )}>
+        {message.content}
+      </div>
+    </div>
+  )
+}
+
+function MessageIndicator({ type }: { type: string }) {
+  return (
+    <div className={cn(
+      "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
+      type === "ai-observation" && "bg-chart-3/15",
+      type === "ai-insight" && "bg-chart-4/15"
+    )}>
+      <div className={cn(
+        "w-2 h-2 rounded-full",
+        type === "ai-observation" && "bg-chart-3/70",
+        type === "ai-insight" && "bg-chart-4/70"
+      )} />
+    </div>
+  )
+}
+
+function ThinkingDots() {
+  return (
+    <span className="flex gap-1">
+      <span className="w-1 h-1 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0ms' }} />
+      <span className="w-1 h-1 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '150ms' }} />
+      <span className="w-1 h-1 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '300ms' }} />
+    </span>
   )
 }
