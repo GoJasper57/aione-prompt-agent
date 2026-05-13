@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Send, Sparkles, Check, Copy, Clock, Save } from "lucide-react"
+import { IntentInput } from "@/components/intent-input"
 
 // Types
 interface Message {
@@ -221,6 +222,7 @@ export default function AIWorkspace() {
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [currentThinkingIndex, setCurrentThinkingIndex] = useState(0)
+  const [thinkingSession, setThinkingSession] = useState(0)
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamedContent, setStreamedContent] = useState("")
   const [showExploration, setShowExploration] = useState(false)
@@ -328,9 +330,13 @@ export default function AIWorkspace() {
   useEffect(() => {
     if (hasSubmitted && currentThinkingIndex < thinkingSequence.length) {
       const currentMessage = thinkingSequence[currentThinkingIndex]
+      const keyedMessage = {
+        ...currentMessage,
+        id: `${currentMessage.id}-${thinkingSession}`
+      }
       
       const cleanup = streamText(currentMessage.content, () => {
-        setMessages(prev => [...prev, currentMessage])
+        setMessages(prev => [...prev, keyedMessage])
         setStreamedContent("")
         
         const delay = 600
@@ -355,17 +361,31 @@ export default function AIWorkspace() {
     }
   }, [hasSubmitted, currentThinkingIndex, streamText, showExploration])
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    if (!userInput.trim() || hasSubmitted) return
-    
-    const prompt = userInput.trim()
-    setSubmittedPrompt(prompt)
-    setMessages([{ id: "user-1", type: "user", content: prompt }])
+  const handleSubmit = useCallback((intent: string) => {
+    if (!intent.trim()) return
+
+    const prompt = intent.trim()
+
+    if (!hasSubmitted) {
+      setSubmittedPrompt(prompt)
+      setMessages([{ id: "user-1", type: "user", content: prompt }])
+      setHasSubmitted(true)
+      setCurrentThinkingIndex(0)
+    } else {
+      // Add ongoing user message and restart the AI feedback flow
+      const newMessage: Message = {
+        id: `user-${Date.now()}`,
+        type: "user",
+        content: prompt
+      }
+      setMessages(prev => [...prev, newMessage])
+      setCurrentThinkingIndex(0)
+      setThinkingSession(prev => prev + 1)
+      setStreamedContent("")
+    }
+
     setUserInput("") // Clear input after submission
-    setHasSubmitted(true)
-    setCurrentThinkingIndex(0)
-  }, [userInput, hasSubmitted])
+  }, [hasSubmitted])
 
   const handleDimensionSelect = (dimensionId: string, option: string) => {
     setClarificationDimensions(prev => prev.map(d => 
@@ -484,7 +504,7 @@ export default function AIWorkspace() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-6">
-          {!hasSubmitted ? (
+          {messages.length === 0 ? (
             <div className="h-full flex flex-col justify-center">
               <div className="space-y-8">
                 {/* Hero Language */}
@@ -568,61 +588,13 @@ export default function AIWorkspace() {
 
         {/* Input Area */}
         <div className="px-6 py-5 border-t border-border/30">
-          {!hasSubmitted ? (
-            <form onSubmit={handleSubmit}>
-              <div className={cn(
-                "relative rounded-2xl transition-all duration-300",
-                "bg-muted/40 border border-border/50",
-                "focus-within:border-primary/40 focus-within:bg-muted/50"
-              )}>
-                <textarea
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSubmit(e)
-                    }
-                  }}
-                  placeholder="Describe a mood, atmosphere, or visual feeling..."
-                  rows={3}
-                  className="w-full bg-transparent px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none"
-                />
-                <div className="absolute bottom-2.5 right-2.5">
-                  <button
-                    type="submit"
-                    disabled={!userInput.trim()}
-                    className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
-                      userInput.trim()
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "bg-muted text-muted-foreground/30"
-                    )}
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </form>
-          ) : (
-            <div className="space-y-3">
-              <div className="relative rounded-2xl bg-muted/20 border border-border/30 p-4">
-                <p className="text-xs text-muted-foreground mb-2">Your creative starting point</p>
-                <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
-                  {submittedPrompt}
-                </p>
-              </div>
-              <div className="relative rounded-2xl bg-muted/40 border border-border/50 transition-all focus-within:border-primary/40 focus-within:bg-muted/50">
-                <textarea
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  placeholder="Add another mood, layer, or refinement..."
-                  rows={2}
-                  className="w-full bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none"
-                />
-              </div>
-            </div>
-          )}
+          <IntentInput
+            onSubmit={handleSubmit}
+            isProcessing={isStreaming}
+            examplePrompt={featuredExample.prompt}
+            value={userInput}
+            onChange={setUserInput}
+          />
         </div>
       </div>
 

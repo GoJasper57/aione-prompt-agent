@@ -4,33 +4,41 @@ import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Send, Sparkles, Lightbulb } from "lucide-react"
 
+// This component is evolving from an initial submission form into a persistent AI collaboration input dock.
+// It now supports ongoing conversational interaction with the AI creative collaborator.
+
 interface IntentInputProps {
   onSubmit: (intent: string) => void
   isProcessing: boolean
   examplePrompt?: string
+  value?: string
+  onChange?: (value: string) => void
 }
 
-export function IntentInput({ onSubmit, isProcessing, examplePrompt }: IntentInputProps) {
-  const [value, setValue] = useState("")
+export function IntentInput({ onSubmit, isProcessing, examplePrompt, value, onChange }: IntentInputProps) {
+  const [internalValue, setInternalValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const currentValue = value !== undefined ? value : internalValue
+  const setCurrentValue = onChange || setInternalValue
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`
     }
-  }, [value])
+  }, [currentValue])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (value.trim() && !isProcessing) {
-      onSubmit(value.trim())
+    if (currentValue.trim() && !isProcessing) {
+      onSubmit(currentValue.trim())
     }
   }
 
   const handleUseExample = () => {
     if (examplePrompt) {
-      setValue(examplePrompt)
+      setCurrentValue(examplePrompt)
     }
   }
 
@@ -58,16 +66,14 @@ export function IntentInput({ onSubmit, isProcessing, examplePrompt }: IntentInp
         )}>
           <textarea
             ref={textareaRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Describe your creative vision..."
-            disabled={isProcessing}
+            value={currentValue}
+            onChange={(e) => setCurrentValue(e.target.value)}
+            placeholder="Add another mood, layer, atmosphere, or refinement..."
             rows={3}
             className={cn(
               "w-full bg-transparent px-4 py-4 text-sm text-foreground",
               "placeholder:text-muted-foreground/50",
-              "focus:outline-none resize-none",
-              "disabled:opacity-60"
+              "focus:outline-none resize-none"
             )}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -90,7 +96,7 @@ export function IntentInput({ onSubmit, isProcessing, examplePrompt }: IntentInp
             
             <button
               type="submit"
-              disabled={!value.trim() || isProcessing}
+              disabled={!currentValue.trim()}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
                 "bg-primary text-primary-foreground",
@@ -101,11 +107,11 @@ export function IntentInput({ onSubmit, isProcessing, examplePrompt }: IntentInp
               {isProcessing ? (
                 <>
                   <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  Exploring...
+                  Thinking...
                 </>
               ) : (
                 <>
-                  Begin
+                  Send
                   <Send className="w-3.5 h-3.5" />
                 </>
               )}
