@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
-import { Send, Sparkles, Check, Copy, Clock } from "lucide-react"
+import { Send, Sparkles, Check, Copy, Clock, Save } from "lucide-react"
 
 // Types
 interface Message {
@@ -42,6 +42,7 @@ interface PromptVersion {
   label: string
   fragments: PromptFragment[]
   timestamp: string
+  isCheckpoint: boolean
 }
 
 // The featured onboarding example - carefully art-directed
@@ -234,6 +235,8 @@ export default function AIWorkspace() {
   const [hoveredFragment, setHoveredFragment] = useState<string | null>(null)
   const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
   const [recentlyChanged, setRecentlyChanged] = useState<string | null>(null)
+  const [workingFragments, setWorkingFragments] = useState<PromptFragment[]>([])
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -244,8 +247,11 @@ export default function AIWorkspace() {
     scrollToBottom()
   }, [messages, streamedContent])
 
-  // Get current prompt fragments
+  // Get current prompt fragments - prioritize working state
   const getCurrentFragments = useCallback((): PromptFragment[] => {
+    if (workingFragments.length > 0) {
+      return workingFragments
+    }
     if (activeVersion && promptVersions.length > 0) {
       const version = promptVersions.find(v => v.id === activeVersion)
       if (version) return version.fragments
@@ -253,7 +259,7 @@ export default function AIWorkspace() {
     const vibe = vibeInterpretations.find(v => v.id === selectedVibe)
     if (vibe) return parsePromptToFragments(vibe.promptTemplate)
     return []
-  }, [selectedVibe, activeVersion, promptVersions])
+  }, [selectedVibe, activeVersion, promptVersions, workingFragments])
 
   // Get prompt as string
   const getPromptString = useCallback(() => {
@@ -269,12 +275,14 @@ export default function AIWorkspace() {
         setPromptVersions([
           {
             id: "v1",
-            label: `${vibe.label} interpretation`,
+            label: `Initial ${vibe.label} direction`,
             fragments,
-            timestamp: "Just now"
+            timestamp: "Just now",
+            isCheckpoint: true
           }
         ])
         setActiveVersion("v1")
+        setWorkingFragments(fragments)
       }
     }
   }, [selectedVibe, promptVersions.length])
@@ -368,34 +376,58 @@ export default function AIWorkspace() {
     if (isCurrentlySelected) {
       setPromptVersions([])
       setActiveVersion(null)
+      setWorkingFragments([])
+      setHasUnsavedChanges(false)
     }
   }
 
+  // Update working fragments without creating a version (live editing)
   const handleFragmentChange = (fragmentId: string, newText: string) => {
     const currentFragments = getCurrentFragments()
     const updatedFragments = currentFragments.map(f => 
       f.id === fragmentId ? { ...f, text: newText, alternatives: getAlternativesForFragment(newText) } : f
     )
     
-    const newVersionId = `v${promptVersions.length + 1}`
-    const changedFragment = currentFragments.find(f => f.id === fragmentId)
-    
-    setPromptVersions(prev => [...prev, {
-      id: newVersionId,
-      label: `Shifted: ${changedFragment?.text} → ${newText}`,
-      fragments: updatedFragments,
-      timestamp: "Just now"
-    }])
-    
-    setActiveVersion(newVersionId)
+    setWorkingFragments(updatedFragments)
+    setHasUnsavedChanges(true)
     setExpandedFragment(null)
     setRecentlyChanged(fragmentId)
     setTimeout(() => setRecentlyChanged(null), 1500)
   }
 
+  // Save a checkpoint - intentional user action
+  const handleSaveCheckpoint = () => {
+    if (!hasUnsavedChanges || workingFragments.length === 0) return
+    
+    const newVersionId = `v${promptVersions.length + 1}`
+    const checkpointLabels = [
+      "Refined direction",
+      "Atmospheric adjustment", 
+      "Tonal shift",
+      "Creative evolution",
+      "Mood refinement"
+    ]
+    const label = checkpointLabels[promptVersions.length % checkpointLabels.length]
+    
+    setPromptVersions(prev => [...prev, {
+      id: newVersionId,
+      label,
+      fragments: workingFragments,
+      timestamp: "Just now",
+      isCheckpoint: true
+    }])
+    
+    setActiveVersion(newVersionId)
+    setHasUnsavedChanges(false)
+  }
+
   const handleCopyPrompt = () => {
     navigator.clipboard.writeText(getPromptString())
     setCopied(true)
+    // Also save as checkpoint when copying
+    if (hasUnsavedChanges) {
+      handleSaveCheckpoint()
+    }
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -434,14 +466,14 @@ export default function AIWorkspace() {
         )}
       >
         {/* Header */}
-        <div className="px-6 py-5 border-b border-border/20">
+        <div className="px-6 py-5 border-b border-border/30">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary" />
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="w-4.5 h-4.5 text-primary" />
             </div>
             <div>
-              <h1 className="text-sm font-medium text-foreground">AIONE</h1>
-              <p className="text-[11px] text-muted-foreground">Creative Clarification</p>
+              <h1 className="text-base font-semibold text-foreground">AIONE</h1>
+              <p className="text-xs text-muted-foreground">Creative Clarification</p>
             </div>
           </div>
         </div>
@@ -453,10 +485,10 @@ export default function AIWorkspace() {
               <div className="space-y-8">
                 {/* Hero Language */}
                 <div className="space-y-3">
-                  <h2 className="text-xl font-medium text-foreground leading-tight">
+                  <h2 className="text-2xl font-semibold text-foreground leading-tight">
                     Bring vague ideas into focus
                   </h2>
-                  <p className="text-sm text-muted-foreground/80 leading-relaxed">
+                  <p className="text-base text-muted-foreground leading-relaxed">
                     Clarify visual ideas through collaborative exploration. Turn half-formed intuitions into clear creative direction.
                   </p>
                 </div>
@@ -467,20 +499,20 @@ export default function AIWorkspace() {
                     onClick={handleExampleClick}
                     className={cn(
                       "w-full text-left p-5 rounded-2xl transition-all duration-300",
-                      "bg-gradient-to-br from-muted/40 via-muted/20 to-transparent",
-                      "border border-border/40 hover:border-primary/30",
-                      "hover:bg-gradient-to-br hover:from-primary/5 hover:via-muted/20 hover:to-transparent",
+                      "bg-gradient-to-br from-muted/50 via-muted/30 to-transparent",
+                      "border border-border/50 hover:border-primary/40",
+                      "hover:bg-gradient-to-br hover:from-primary/10 hover:via-muted/30 hover:to-transparent",
                       "group"
                     )}
                   >
-                    <p className="text-sm text-foreground/90 leading-relaxed mb-3 group-hover:text-foreground transition-colors">
+                    <p className="text-sm text-foreground leading-relaxed mb-3 group-hover:text-foreground transition-colors">
                       {featuredExample.prompt}
                     </p>
-                    <span className="text-[11px] text-primary/70 group-hover:text-primary transition-colors">
+                    <span className="text-xs text-primary/80 font-medium group-hover:text-primary transition-colors">
                       {featuredExample.label}
                     </span>
                   </button>
-                  <p className="text-[11px] text-muted-foreground/50 text-center">
+                  <p className="text-xs text-muted-foreground text-center">
                     Click to use as starting point
                   </p>
                 </div>
@@ -507,9 +539,9 @@ export default function AIWorkspace() {
                         : "bg-chart-4"
                     )} />
                   </div>
-                  <div className="flex-1 text-sm leading-relaxed text-foreground/90">
+                  <div className="flex-1 text-sm leading-relaxed text-foreground">
                     {streamedContent}
-                    <span className="inline-block w-0.5 h-4 bg-primary/60 ml-0.5 animate-blink" />
+                    <span className="inline-block w-0.5 h-4 bg-primary/70 ml-0.5 animate-blink" />
                   </div>
                 </div>
               )}
@@ -531,12 +563,12 @@ export default function AIWorkspace() {
         </div>
 
         {/* Input Area */}
-        <div className="px-6 py-5 border-t border-border/20">
+        <div className="px-6 py-5 border-t border-border/30">
           <form onSubmit={handleSubmit}>
             <div className={cn(
               "relative rounded-2xl transition-all duration-300",
-              "bg-muted/30 border border-border/40",
-              "focus-within:border-primary/30 focus-within:bg-muted/40",
+              "bg-muted/40 border border-border/50",
+              "focus-within:border-primary/40 focus-within:bg-muted/50",
               hasSubmitted && "opacity-50 pointer-events-none"
             )}>
               <textarea
@@ -551,7 +583,7 @@ export default function AIWorkspace() {
                 placeholder="Describe a mood, atmosphere, or visual feeling..."
                 disabled={hasSubmitted}
                 rows={3}
-                className="w-full bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none resize-none"
+                className="w-full bg-transparent px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none"
               />
               <div className="absolute bottom-2.5 right-2.5">
                 <button
@@ -581,7 +613,7 @@ export default function AIWorkspace() {
         )}
       >
         <div className={cn(
-          "p-8 space-y-8",
+          "p-8 space-y-10",
           showPromptWorkspace ? "max-w-lg" : "max-w-2xl mx-auto"
         )}>
           
@@ -592,21 +624,21 @@ export default function AIWorkspace() {
               explorationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <h2 className="text-lg font-medium text-foreground mb-1">Shape Your Vision</h2>
-            <p className="text-sm text-muted-foreground/80">Clarify and deepen the creative direction</p>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Shape Your Vision</h2>
+            <p className="text-sm text-muted-foreground">Clarify and deepen the creative direction</p>
           </div>
 
-          {/* Creative Clarification - Soft surfacing of shapable dimensions */}
+          {/* Creative Clarification - Structural shaping */}
           <div 
             className={cn(
-              "transition-all duration-500",
+              "transition-all duration-500 pb-6 border-b border-border/30",
               explorationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <p className="text-[11px] text-muted-foreground/60 mb-3">
-              Ways to deepen the direction
+            <p className="text-xs font-medium text-muted-foreground mb-4 uppercase tracking-wide">
+              Structural Dimensions
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               {shapableDimensions.map((dimension, index) => (
                 <div 
                   key={dimension.id}
@@ -619,19 +651,19 @@ export default function AIWorkspace() {
                   <button
                     onClick={() => setExpandedDimension(expandedDimension === dimension.id ? null : dimension.id)}
                     className={cn(
-                      "px-3 py-1.5 rounded-full text-xs transition-all",
+                      "px-3.5 py-2 rounded-xl text-sm transition-all",
                       "border",
                       dimension.selectedOption
-                        ? "bg-primary/10 border-primary/30 text-foreground"
-                        : "bg-muted/20 border-border/40 text-muted-foreground hover:border-primary/20 hover:text-foreground hover:bg-muted/30"
+                        ? "bg-primary/15 border-primary/40 text-foreground font-medium"
+                        : "bg-muted/30 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground hover:bg-muted/40"
                     )}
                   >
                     {dimension.selectedOption || dimension.label}
                   </button>
                   
                   {expandedDimension === dimension.id && dimension.options && (
-                    <div className="absolute z-20 left-0 top-full mt-2 min-w-[200px] p-2 rounded-xl bg-card border border-border/50 shadow-xl animate-expand">
-                      <p className="px-2 py-1 text-[10px] text-muted-foreground/60 mb-1">
+                    <div className="absolute z-30 left-0 top-full mt-2 min-w-[240px] p-3 rounded-xl bg-card border border-border/60 shadow-2xl animate-expand">
+                      <p className="px-2 py-1.5 text-xs text-muted-foreground mb-2">
                         {dimension.description}
                       </p>
                       {dimension.options.map((option) => (
@@ -639,11 +671,11 @@ export default function AIWorkspace() {
                           key={option}
                           onClick={() => handleDimensionSelect(dimension.id, option)}
                           className={cn(
-                            "w-full px-3 py-2 rounded-lg text-xs text-left transition-all",
-                            "hover:bg-primary/10 hover:text-primary",
+                            "w-full px-3 py-2.5 rounded-lg text-sm text-left transition-all",
+                            "hover:bg-primary/15 hover:text-primary",
                             dimension.selectedOption === option
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground"
+                              ? "bg-primary/15 text-primary font-medium"
+                              : "text-foreground"
                           )}
                         >
                           {option}
@@ -656,15 +688,15 @@ export default function AIWorkspace() {
             </div>
           </div>
 
-          {/* Vibe Interpretations - Organic atmospheric grid */}
+          {/* Vibe Interpretations - Emotional / cinematic reinterpretation */}
           <div 
             className={cn(
               "transition-all duration-500",
               explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <p className="text-[11px] text-muted-foreground/60 mb-4">
-              Visual interpretations
+            <p className="text-xs font-medium text-muted-foreground mb-4 uppercase tracking-wide">
+              Emotional Interpretations
             </p>
             
             {/* Organic staggered grid */}
@@ -723,14 +755,14 @@ export default function AIWorkspace() {
                     )}
                     
                     {/* Label */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <div className="absolute bottom-0 left-0 right-0 p-3.5">
                       <p className={cn(
-                        "text-xs font-medium text-white/90 mb-0.5 transition-colors",
+                        "text-sm font-medium text-white mb-0.5 transition-colors",
                         isSelected && "text-white"
                       )}>
                         {vibe.label}
                       </p>
-                      <p className="text-[10px] text-white/50 line-clamp-1">
+                      <p className="text-xs text-white/60 line-clamp-1">
                         {vibe.atmosphere}
                       </p>
                     </div>
@@ -752,7 +784,7 @@ export default function AIWorkspace() {
             : "w-0 opacity-0 translate-x-8 pointer-events-none"
         )}
       >
-        <div className="p-8 space-y-6">
+        <div className="p-8 space-y-8">
           
           {/* Header */}
           <div 
@@ -761,8 +793,8 @@ export default function AIWorkspace() {
               promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <h2 className="text-lg font-medium text-foreground mb-0.5">Refine</h2>
-            <p className="text-sm text-muted-foreground/80">Click highlighted elements to explore variations</p>
+            <h2 className="text-xl font-semibold text-foreground mb-1">Refine</h2>
+            <p className="text-sm text-muted-foreground">Click highlighted elements to explore variations</p>
           </div>
 
           {/* Interactive Prompt - The Main Steering Interface */}
@@ -772,8 +804,8 @@ export default function AIWorkspace() {
               promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <div className="relative rounded-2xl bg-muted/10 border border-border/30 p-6 group">
-              <p className="text-sm leading-[1.9] text-foreground/90">
+            <div className="relative rounded-2xl bg-muted/15 border border-border/40 p-6 group">
+              <p className="text-sm leading-[2] text-foreground">
                 {getCurrentFragments().map((fragment) => {
                   if (!fragment.isEditable) {
                     return <span key={fragment.id}>{fragment.text}</span>
@@ -807,9 +839,9 @@ export default function AIWorkspace() {
                       
                       {/* Semantic reinterpretation options */}
                       {isExpanded && fragment.alternatives && (
-                        <span className="absolute z-10 left-0 top-full mt-2 animate-expand">
-                          <span className="flex flex-col gap-0.5 p-2 rounded-xl bg-card border border-border/50 shadow-xl min-w-[220px]">
-                            <span className="px-2 py-1.5 text-[10px] text-muted-foreground/70">
+                        <span className="absolute z-30 left-0 top-full mt-2 animate-expand">
+                          <span className="flex flex-col gap-0.5 p-3 rounded-xl bg-card border border-border/60 shadow-2xl min-w-[240px]">
+                            <span className="px-2 py-1.5 text-xs text-muted-foreground">
                               Reimagine this element
                             </span>
                             {fragment.alternatives.map((alt) => (
@@ -820,9 +852,9 @@ export default function AIWorkspace() {
                                   handleFragmentChange(fragment.id, alt)
                                 }}
                                 className={cn(
-                                  "px-3 py-2 rounded-lg text-xs text-left transition-all",
-                                  "hover:bg-primary/10 hover:text-primary",
-                                  "text-muted-foreground"
+                                  "px-3 py-2.5 rounded-lg text-sm text-left transition-all",
+                                  "hover:bg-primary/15 hover:text-primary",
+                                  "text-foreground"
                                 )}
                               >
                                 {alt}
@@ -836,76 +868,89 @@ export default function AIWorkspace() {
                 })}
               </p>
               
-              {/* Copy button */}
-              <div className="absolute top-4 right-4">
+              {/* Action buttons */}
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                {hasUnsavedChanges && (
+                  <button 
+                    onClick={handleSaveCheckpoint}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                )}
                 <button 
                   onClick={handleCopyPrompt}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors opacity-0 group-hover:opacity-100"
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors opacity-0 group-hover:opacity-100"
                 >
-                  {copied ? <Check className="w-3 h-3 text-chart-4" /> : <Copy className="w-3 h-3" />}
+                  {copied ? <Check className="w-3.5 h-3.5 text-chart-3" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Version History - Timeline Style */}
+          {/* Saved Directions - Timeline Style */}
           <div 
             className={cn(
-              "space-y-3 transition-all duration-500",
+              "space-y-4 transition-all duration-500",
               promptPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
             <div className="flex items-center gap-2">
-              <Clock className="w-3 h-3 text-muted-foreground/60" />
-              <h3 className="text-xs font-medium text-muted-foreground/60">
-                Evolution
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-muted-foreground">
+                Saved Directions
               </h3>
             </div>
             
-            <div className="relative pl-4 border-l border-border/30 space-y-3">
-              {promptVersions.map((version, index) => {
+            <div className="relative pl-5 border-l-2 border-border/40 space-y-3">
+              {promptVersions.filter(v => v.isCheckpoint).map((version, index, filtered) => {
                 const isActive = activeVersion === version.id
-                const isLatest = index === promptVersions.length - 1
+                const isLatest = index === filtered.length - 1
                 
                 return (
                   <button
                     key={version.id}
-                    onClick={() => setActiveVersion(version.id)}
+                    onClick={() => {
+                      setActiveVersion(version.id)
+                      setWorkingFragments(version.fragments)
+                      setHasUnsavedChanges(false)
+                    }}
                     className={cn(
-                      "relative w-full text-left pl-4 py-2 rounded-r-lg transition-all",
+                      "relative w-full text-left pl-4 py-2.5 rounded-r-lg transition-all",
                       isActive 
-                        ? "bg-primary/5" 
-                        : "hover:bg-muted/20"
+                        ? "bg-primary/10" 
+                        : "hover:bg-muted/30"
                     )}
                   >
                     {/* Timeline dot */}
                     <div className={cn(
-                      "absolute -left-[21px] top-3 w-3 h-3 rounded-full border-2 transition-colors",
+                      "absolute -left-[25px] top-3.5 w-3.5 h-3.5 rounded-full border-2 transition-colors",
                       isActive 
                         ? "bg-primary border-primary" 
-                        : "bg-background border-border/50"
+                        : "bg-background border-border"
                     )} />
                     
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={cn(
-                            "text-xs font-medium",
-                            isActive ? "text-primary" : "text-foreground/70"
+                            "text-sm font-medium",
+                            isActive ? "text-primary" : "text-foreground"
                           )}>
-                            V{index + 1}
+                            {index + 1}
                           </span>
                           {isLatest && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/20 text-primary">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
                               Current
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {version.label}
                         </p>
                       </div>
-                      <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
                         {version.timestamp}
                       </span>
                     </div>
@@ -925,7 +970,7 @@ function MessageBubble({ message }: { message: Message }) {
   if (message.type === "user") {
     return (
       <div className="flex justify-end animate-fade-in">
-        <div className="max-w-[90%] bg-primary/10 border border-primary/20 rounded-2xl rounded-br-md px-4 py-2.5">
+        <div className="max-w-[90%] bg-primary/15 border border-primary/25 rounded-2xl rounded-br-md px-4 py-3">
           <p className="text-sm text-foreground leading-relaxed">{message.content}</p>
         </div>
       </div>
@@ -935,15 +980,15 @@ function MessageBubble({ message }: { message: Message }) {
   return (
     <div className="flex items-start gap-3 animate-fade-in">
       <div className={cn(
-        "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
+        "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
         message.type === "ai-insight" ? "bg-primary/20" : "bg-chart-4/20"
       )}>
         <div className={cn(
-          "w-1.5 h-1.5 rounded-full",
+          "w-2 h-2 rounded-full",
           message.type === "ai-insight" ? "bg-primary" : "bg-chart-4"
         )} />
       </div>
-      <span className="text-sm leading-relaxed text-foreground/90">
+      <span className="text-sm leading-relaxed text-foreground">
         {message.content}
       </span>
     </div>
