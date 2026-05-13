@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
-import { Send, Sparkles, ChevronDown, Check, Lightbulb, Palette, Camera, Eye, Copy, Clock } from "lucide-react"
+import { Send, Sparkles, Check, Copy, Clock } from "lucide-react"
 
 // Types
 interface Message {
@@ -11,21 +11,21 @@ interface Message {
   content: string
 }
 
-interface MissingDimension {
+interface ClarificationDimension {
   id: string
   label: string
-  icon: React.ReactNode
-  options: string[]
+  description: string
+  isPresent: boolean
+  options?: string[]
   selectedOption?: string
 }
 
-interface Direction {
+interface VibeInterpretation {
   id: string
-  title: string
-  description: string
-  alignmentLabel: string
-  previewGradient: string
-  previewAccent: string
+  label: string
+  atmosphere: string
+  gradient: string
+  accentPosition: string
   promptTemplate: string
 }
 
@@ -33,6 +33,7 @@ interface PromptFragment {
   id: string
   text: string
   isEditable: boolean
+  category?: string
   alternatives?: string[]
 }
 
@@ -43,65 +44,95 @@ interface PromptVersion {
   timestamp: string
 }
 
-// Inspiration starters for empty state
-const inspirationStarters = [
-  "Rainy urban loneliness",
-  "Dreamlike fashion portrait",
-  "Warm nostalgic street photography",
-  "Cyberpunk night scene",
-  "Cinematic emotional realism",
-]
+// The featured onboarding example - carefully art-directed
+const featuredExample = {
+  prompt: "A lone figure walks through a rain-soaked Tokyo alley at 2am, illuminated by cold neon reflections and drifting steam. The atmosphere feels emotionally distant but strangely intimate, framed like a quiet cinematic memory with soft film grain and muted contrast.",
+  label: "Neo-noir cinematic realism"
+}
 
 // Shortened AI messages - only 2 before exploration
 const thinkingSequence: Message[] = [
-  { id: "t1", type: "ai-insight", content: "I'm detecting a cinematic urban mood with emotional isolation themes." },
-  { id: "t2", type: "ai-transition", content: "Several visual directions are emerging." },
+  { id: "t1", type: "ai-insight", content: "I can see the emotional atmosphere you're reaching for." },
+  { id: "t2", type: "ai-transition", content: "Let me help you clarify and shape this further." },
 ]
 
-const initialDimensions: MissingDimension[] = [
-  { id: "lighting", label: "Lighting Intensity", icon: <Lightbulb className="w-4 h-4" />, options: ["Subtle ambient glow", "Dramatic neon contrast", "Soft diffused light", "Harsh street lighting"] },
-  { id: "palette", label: "Color Temperature", icon: <Palette className="w-4 h-4" />, options: ["Cool cyan tones", "Warm amber highlights", "Muted desaturated", "High contrast complementary"] },
-  { id: "perspective", label: "Camera Perspective", icon: <Camera className="w-4 h-4" />, options: ["Intimate close-up", "Environmental wide", "Low angle dramatic", "Eye-level neutral"] },
-  { id: "focus", label: "Subject Focus", icon: <Eye className="w-4 h-4" />, options: ["Sharp foreground blur", "Soft overall focus", "Deep depth of field", "Selective bokeh"] },
+// Creative Clarification Framework - 8 dimensions
+const clarificationFramework: ClarificationDimension[] = [
+  { id: "subject", label: "Subject", description: "Who or what is the focus", isPresent: true },
+  { id: "environment", label: "Environment", description: "Where this takes place", isPresent: true },
+  { id: "emotional-tone", label: "Emotional Tone", description: "The feeling it evokes", isPresent: true },
+  { id: "lighting", label: "Lighting & Color", description: "How light shapes the mood", isPresent: false, options: ["Cold neon glow", "Warm tungsten intimacy", "Harsh contrast shadows", "Soft diffused ambience"] },
+  { id: "framing", label: "Framing & Perspective", description: "How we see the scene", isPresent: false, options: ["Intimate close framing", "Environmental wide shot", "Low angle dramatic", "Voyeuristic distance"] },
+  { id: "motion", label: "Motion & Energy", description: "Stillness or movement", isPresent: false, options: ["Frozen stillness", "Subtle motion blur", "Dynamic energy", "Dreamlike drift"] },
+  { id: "style", label: "Visual Style", description: "The aesthetic language", isPresent: false, options: ["Photorealistic cinema", "Analog film texture", "Painterly atmosphere", "Minimal graphic"] },
+  { id: "atmosphere", label: "Atmosphere & Texture", description: "Environmental mood", isPresent: false, options: ["Misty and ethereal", "Gritty and raw", "Clean and precise", "Layered and dense"] },
 ]
 
-// Directions with visual previews and semantic alignment labels - 4 strong directions
-const directions: Direction[] = [
+// Vibe Interpretations - 8 atmospheric possibilities with organic layout
+const vibeInterpretations: VibeInterpretation[] = [
   { 
-    id: "d1", 
-    title: "Blade Runner Homage", 
-    description: "Heavy neon saturation with cyan and magenta reflections. Subject as silhouette against luminous city backdrop.", 
-    alignmentLabel: "Strong emotional alignment",
-    previewGradient: "from-cyan-500/40 via-fuchsia-500/30 to-blue-900/50",
-    previewAccent: "cyan",
-    promptTemplate: "A lone figure stands in heavy rain on a [neon-lit] city street at night. Blade Runner aesthetic with [heavy cyan and magenta] neon reflections on wet pavement. Subject rendered as a [dark silhouette] against the luminous urban backdrop. [Cinematic composition] emphasizing human scale against towering architecture. Atmospheric fog diffusing the countless neon signs. Photorealistic, dramatic lighting."
+    id: "v1", 
+    label: "Neo-noir melancholy", 
+    atmosphere: "Heavy shadows, isolated neon pools",
+    gradient: "from-cyan-600/50 via-blue-900/40 to-slate-950/60",
+    accentPosition: "top-right",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, illuminated by [cold neon reflections] and drifting steam. The atmosphere feels [emotionally distant] but strangely intimate, framed like a [quiet cinematic memory] with soft film grain and muted contrast. Neo-noir aesthetic with [deep shadows] and isolated pools of neon light."
   },
   { 
-    id: "d2", 
-    title: "Wong Kar-wai Romance", 
-    description: "Intimate framing with motion blur and warm tungsten lighting bleeding through rain.", 
-    alignmentLabel: "Emotionally grounded",
-    previewGradient: "from-amber-500/40 via-orange-400/30 to-rose-900/40",
-    previewAccent: "amber",
-    promptTemplate: "Intimate portrait of a contemplative figure in [gentle rain], city lights [softly blurred] in background. Wong Kar-wai inspired cinematography with [warm tungsten tones] bleeding through cool blue atmosphere. Subtle motion blur suggesting fleeting moments. [Shallow depth of field] focusing on emotional expression. Film grain texture, melancholic beauty."
+    id: "v2", 
+    label: "Soft nostalgic realism", 
+    atmosphere: "Warm grain, faded memory",
+    gradient: "from-amber-500/40 via-orange-800/30 to-stone-900/50",
+    accentPosition: "top-left",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, illuminated by [warm tungsten glow] filtering through steam. The atmosphere feels [tenderly melancholic] and strangely intimate, framed like a [fading photograph] with heavy film grain and nostalgic warmth. Soft realism with [gentle light diffusion]."
   },
   { 
-    id: "d3", 
-    title: "Noir Minimalism", 
-    description: "High contrast black and white with dramatic shadows and isolated pools of light.", 
-    alignmentLabel: "Cinematic tension",
-    previewGradient: "from-zinc-800/60 via-neutral-700/40 to-black/70",
-    previewAccent: "slate",
-    promptTemplate: "Striking monochrome scene of a solitary figure in [heavy rain]. Classic film noir aesthetic with [deep shadows] and isolated pools of [harsh streetlight]. High contrast black and white, grain texture. [Dramatic low-key lighting] creating mystery and tension. Wet pavement reflecting sparse light sources. Timeless, atmospheric, contemplative."
+    id: "v3", 
+    label: "Dreamlike atmospheric ambiguity", 
+    atmosphere: "Hazy boundaries, uncertain forms",
+    gradient: "from-violet-600/30 via-indigo-800/40 to-slate-900/50",
+    accentPosition: "center",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, forms [dissolving into mist] and drifting steam. The atmosphere feels [surreally detached] and strangely intimate, framed like a [half-remembered dream] with soft focus and ambiguous boundaries. Dreamlike quality with [ethereal light bleeding]."
   },
   { 
-    id: "d4", 
-    title: "Contemporary Realism", 
-    description: "Naturalistic lighting with muted color palette. Documentary-style framing.", 
-    alignmentLabel: "Experimental interpretation",
-    previewGradient: "from-slate-500/30 via-zinc-400/20 to-neutral-800/40",
-    previewAccent: "slate",
-    promptTemplate: "Documentary-style photograph of a person standing alone in [urban rain]. [Natural city lighting] with muted, desaturated color palette. Authentic street photography composition, [unposed and candid] feeling. Overcast ambient lighting with subtle reflections on wet concrete. Contemporary realism, editorial quality."
+    id: "v4", 
+    label: "Minimal brutalist isolation", 
+    atmosphere: "Stark geometry, emotional void",
+    gradient: "from-zinc-700/50 via-neutral-800/40 to-black/70",
+    accentPosition: "bottom",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, reduced to [geometric silhouette] against stark concrete. The atmosphere feels [coldly isolated] and strangely intimate, framed with [brutal minimalism] and high contrast. Clean lines, [deep blacks], architectural emptiness."
+  },
+  { 
+    id: "v5", 
+    label: "Analog film intimacy", 
+    atmosphere: "Textured warmth, human imperfection",
+    gradient: "from-rose-500/30 via-pink-900/30 to-stone-900/50",
+    accentPosition: "top-left",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, captured with [visible film grain] and color shifts. The atmosphere feels [intimately human] and strangely warm, framed like a [candid street photograph] with natural imperfections. Analog texture with [subtle color cast]."
+  },
+  { 
+    id: "v6", 
+    label: "Surreal ambient haze", 
+    atmosphere: "Otherworldly glow, liminal space",
+    gradient: "from-teal-500/40 via-emerald-900/30 to-slate-950/50",
+    accentPosition: "center",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, surrounded by [otherworldly ambient glow]. The atmosphere feels [liminal and strange] but strangely intimate, framed like a [scene between realities] with surreal color and soft edges. Ethereal quality with [impossible lighting]."
+  },
+  { 
+    id: "v7", 
+    label: "Documentary rawness", 
+    atmosphere: "Unfiltered truth, street grit",
+    gradient: "from-stone-600/40 via-neutral-700/30 to-zinc-900/50",
+    accentPosition: "bottom-left",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, captured with [unflinching documentary eye]. The atmosphere feels [authentically raw] and strangely intimate, framed like a [stolen moment] with natural lighting and urban grit. Street photography with [honest imperfection]."
+  },
+  { 
+    id: "v8", 
+    label: "Cinematic grandeur", 
+    atmosphere: "Epic scale, emotional weight",
+    gradient: "from-sky-600/40 via-blue-800/40 to-indigo-950/60",
+    accentPosition: "top-right",
+    promptTemplate: "A lone figure walks through a [rain-soaked] Tokyo alley at 2am, [dwarfed by towering architecture]. The atmosphere feels [epically lonely] but strangely intimate, framed like a [widescreen cinema moment] with dramatic composition. Cinematic scope with [architectural grandeur]."
   },
 ]
 
@@ -114,7 +145,6 @@ function parsePromptToFragments(template: string): PromptFragment[] {
   let id = 0
 
   while ((match = regex.exec(template)) !== null) {
-    // Add text before the bracket
     if (match.index > lastIndex) {
       fragments.push({
         id: `f${id++}`,
@@ -123,7 +153,6 @@ function parsePromptToFragments(template: string): PromptFragment[] {
       })
     }
     
-    // Add the editable fragment
     fragments.push({
       id: `f${id++}`,
       text: match[1],
@@ -134,7 +163,6 @@ function parsePromptToFragments(template: string): PromptFragment[] {
     lastIndex = match.index + match[0].length
   }
   
-  // Add remaining text
   if (lastIndex < template.length) {
     fragments.push({
       id: `f${id++}`,
@@ -149,20 +177,41 @@ function parsePromptToFragments(template: string): PromptFragment[] {
 // Get semantic alternatives for editable fragments
 function getAlternativesForFragment(text: string): string[] {
   const alternativesMap: Record<string, string[]> = {
-    "neon-lit": ["soft tungsten glow", "overcast realism", "cinematic haze", "harsh noir contrast"],
-    "heavy cyan and magenta": ["muted teal tones", "warm amber wash", "cold blue monochrome", "desaturated pastels"],
-    "dark silhouette": ["softly lit figure", "partial shadow", "backlit outline", "detailed presence"],
-    "Cinematic composition": ["Documentary framing", "Intimate portrait", "Wide establishing shot", "Abstract crop"],
-    "gentle rain": ["heavy downpour", "misty drizzle", "scattered droplets", "storm aftermath"],
-    "softly blurred": ["sharply focused", "motion streaked", "dreamlike haze", "crisp detail"],
-    "warm tungsten tones": ["cool blue cast", "neutral daylight", "golden hour warmth", "neon color splash"],
-    "Shallow depth of field": ["Deep focus throughout", "Selective bokeh", "Tilt-shift effect", "Sharp foreground blur"],
-    "urban rain": ["city drizzle", "night storm", "wet aftermath", "passing shower"],
-    "Natural city lighting": ["Dramatic neon glow", "Soft ambient light", "Harsh streetlamp", "Diffused overcast"],
-    "unposed and candid": ["carefully composed", "dynamically posed", "frozen in motion", "contemplatively still"],
+    "rain-soaked": ["mist-shrouded", "neon-drenched", "steam-filled", "shadow-wrapped"],
+    "cold neon reflections": ["warm amber pools", "harsh white glare", "soft diffused glow", "flickering color"],
+    "emotionally distant": ["tenderly melancholic", "quietly contemplative", "achingly present", "peacefully detached"],
+    "quiet cinematic memory": ["fading photograph", "half-forgotten dream", "stolen moment", "eternal pause"],
+    "deep shadows": ["gentle darkness", "layered grays", "absolute blacks", "soft penumbra"],
+    "warm tungsten glow": ["cold fluorescent wash", "mixed color sources", "single spotlight", "ambient scatter"],
+    "tenderly melancholic": ["bittersweet nostalgia", "quiet acceptance", "wistful longing", "peaceful sadness"],
+    "fading photograph": ["vivid memory", "impressionist blur", "sharp recollection", "watercolor wash"],
+    "gentle light diffusion": ["harsh direct light", "dappled shadows", "even illumination", "dramatic contrast"],
+    "dissolving into mist": ["sharply defined", "partially obscured", "fragmenting into light", "merging with shadow"],
+    "surreally detached": ["hyperreal present", "floating awareness", "grounded uncertainty", "lucid distance"],
+    "half-remembered dream": ["vivid hallucination", "waking vision", "subconscious flash", "memory fragment"],
+    "ethereal light bleeding": ["contained illumination", "light leaking", "glowing edges", "soft radiation"],
+    "geometric silhouette": ["detailed figure", "soft outline", "fragmented form", "solid presence"],
+    "coldly isolated": ["warmly solitary", "peacefully alone", "achingly separate", "contentedly distant"],
+    "brutal minimalism": ["rich complexity", "subtle detail", "stark simplicity", "elegant reduction"],
+    "visible film grain": ["smooth digital clarity", "heavy texture", "subtle noise", "organic imperfection"],
+    "intimately human": ["coolly observed", "warmly embraced", "honestly captured", "tenderly seen"],
+    "candid street photograph": ["composed portrait", "spontaneous capture", "observed moment", "witnessed scene"],
+    "subtle color cast": ["neutral accuracy", "bold color shift", "monochromatic tint", "cross-processed look"],
+    "otherworldly ambient glow": ["natural light source", "artificial illumination", "bioluminescent feel", "radioactive cast"],
+    "liminal and strange": ["familiar and grounded", "uncanny and shifted", "dreamlike and floating", "hyperreal and sharp"],
+    "scene between realities": ["grounded moment", "parallel existence", "threshold space", "dimensional slip"],
+    "impossible lighting": ["motivated light", "practical sources", "available light", "studio precision"],
+    "unflinching documentary eye": ["romanticized gaze", "poetic interpretation", "raw observation", "gentle witness"],
+    "authentically raw": ["carefully polished", "honestly imperfect", "beautifully flawed", "unfiltered truth"],
+    "stolen moment": ["composed scene", "decisive instant", "patient observation", "quick glimpse"],
+    "honest imperfection": ["careful precision", "natural accident", "embraced flaw", "authentic error"],
+    "dwarfed by towering architecture": ["intimate with surroundings", "balanced in scale", "dominating the frame", "lost in space"],
+    "epically lonely": ["quietly solitary", "grandly isolated", "peacefully alone", "dramatically singular"],
+    "widescreen cinema moment": ["intimate portrait crop", "square contemplation", "vertical drama", "panoramic sweep"],
+    "architectural grandeur": ["human intimacy", "environmental detail", "spatial compression", "volumetric depth"],
   }
   
-  return alternativesMap[text] || ["subtle variation", "dramatic interpretation", "minimal approach", "bold alternative"]
+  return alternativesMap[text] || ["subtle shift", "dramatic reinterpretation", "softer approach", "bolder direction"]
 }
 
 export default function AIWorkspace() {
@@ -174,9 +223,9 @@ export default function AIWorkspace() {
   const [streamedContent, setStreamedContent] = useState("")
   const [showExploration, setShowExploration] = useState(false)
   const [explorationPhase, setExplorationPhase] = useState(0)
-  const [dimensions, setDimensions] = useState<MissingDimension[]>(initialDimensions)
+  const [clarificationDimensions, setClarificationDimensions] = useState<ClarificationDimension[]>(clarificationFramework)
   const [expandedDimension, setExpandedDimension] = useState<string | null>(null)
-  const [selectedDirection, setSelectedDirection] = useState<string | null>(null)
+  const [selectedVibe, setSelectedVibe] = useState<string | null>(null)
   const [showPromptWorkspace, setShowPromptWorkspace] = useState(false)
   const [promptPhase, setPromptPhase] = useState(0)
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
@@ -201,26 +250,26 @@ export default function AIWorkspace() {
       const version = promptVersions.find(v => v.id === activeVersion)
       if (version) return version.fragments
     }
-    const direction = directions.find(d => d.id === selectedDirection)
-    if (direction) return parsePromptToFragments(direction.promptTemplate)
+    const vibe = vibeInterpretations.find(v => v.id === selectedVibe)
+    if (vibe) return parsePromptToFragments(vibe.promptTemplate)
     return []
-  }, [selectedDirection, activeVersion, promptVersions])
+  }, [selectedVibe, activeVersion, promptVersions])
 
   // Get prompt as string
   const getPromptString = useCallback(() => {
     return getCurrentFragments().map(f => f.text).join('')
   }, [getCurrentFragments])
 
-  // Initialize prompt versions when direction is selected
+  // Initialize prompt versions when vibe is selected
   useEffect(() => {
-    if (selectedDirection && promptVersions.length === 0) {
-      const direction = directions.find(d => d.id === selectedDirection)
-      if (direction) {
-        const fragments = parsePromptToFragments(direction.promptTemplate)
+    if (selectedVibe && promptVersions.length === 0) {
+      const vibe = vibeInterpretations.find(v => v.id === selectedVibe)
+      if (vibe) {
+        const fragments = parsePromptToFragments(vibe.promptTemplate)
         setPromptVersions([
           {
             id: "v1",
-            label: `Initial ${direction.title.toLowerCase()} interpretation`,
+            label: `${vibe.label} interpretation`,
             fragments,
             timestamp: "Just now"
           }
@@ -228,11 +277,11 @@ export default function AIWorkspace() {
         setActiveVersion("v1")
       }
     }
-  }, [selectedDirection, promptVersions.length])
+  }, [selectedVibe, promptVersions.length])
 
-  // Trigger prompt workspace when direction is selected
+  // Trigger prompt workspace when vibe is selected
   useEffect(() => {
-    if (selectedDirection && !showPromptWorkspace) {
+    if (selectedVibe && !showPromptWorkspace) {
       const timer = setTimeout(() => {
         setShowPromptWorkspace(true)
         setTimeout(() => setPromptPhase(1), 200)
@@ -240,11 +289,11 @@ export default function AIWorkspace() {
       }, 300)
       return () => clearTimeout(timer)
     }
-    if (!selectedDirection) {
+    if (!selectedVibe) {
       setShowPromptWorkspace(false)
       setPromptPhase(0)
     }
-  }, [selectedDirection, showPromptWorkspace])
+  }, [selectedVibe, showPromptWorkspace])
 
   // Stream text character by character
   const streamText = useCallback((text: string, onComplete: () => void) => {
@@ -261,12 +310,12 @@ export default function AIWorkspace() {
         setIsStreaming(false)
         onComplete()
       }
-    }, 25)
+    }, 30)
     
     return () => clearInterval(interval)
   }, [])
 
-  // Progressive message reveal - now much faster
+  // Progressive message reveal
   useEffect(() => {
     if (hasSubmitted && currentThinkingIndex < thinkingSequence.length) {
       const currentMessage = thinkingSequence[currentThinkingIndex]
@@ -275,7 +324,7 @@ export default function AIWorkspace() {
         setMessages(prev => [...prev, currentMessage])
         setStreamedContent("")
         
-        const delay = 800 // Fast transition
+        const delay = 600
         const timer = setTimeout(() => {
           setCurrentThinkingIndex(prev => prev + 1)
         }, delay)
@@ -286,13 +335,12 @@ export default function AIWorkspace() {
       return cleanup
     }
     
-    // Show exploration immediately after 2 messages
     if (hasSubmitted && currentThinkingIndex >= thinkingSequence.length && !showExploration) {
       const timer = setTimeout(() => {
         setShowExploration(true)
         setTimeout(() => setExplorationPhase(1), 200)
-        setTimeout(() => setExplorationPhase(2), 500)
-        setTimeout(() => setExplorationPhase(3), 900)
+        setTimeout(() => setExplorationPhase(2), 600)
+        setTimeout(() => setExplorationPhase(3), 1000)
       }, 300)
       return () => clearTimeout(timer)
     }
@@ -308,15 +356,15 @@ export default function AIWorkspace() {
   }, [userInput, hasSubmitted])
 
   const handleDimensionSelect = (dimensionId: string, option: string) => {
-    setDimensions(prev => prev.map(d => 
-      d.id === dimensionId ? { ...d, selectedOption: option } : d
+    setClarificationDimensions(prev => prev.map(d => 
+      d.id === dimensionId ? { ...d, selectedOption: option, isPresent: true } : d
     ))
     setExpandedDimension(null)
   }
 
-  const handleDirectionSelect = (directionId: string) => {
-    const isCurrentlySelected = selectedDirection === directionId
-    setSelectedDirection(isCurrentlySelected ? null : directionId)
+  const handleVibeSelect = (vibeId: string) => {
+    const isCurrentlySelected = selectedVibe === vibeId
+    setSelectedVibe(isCurrentlySelected ? null : vibeId)
     if (isCurrentlySelected) {
       setPromptVersions([])
       setActiveVersion(null)
@@ -334,7 +382,7 @@ export default function AIWorkspace() {
     
     setPromptVersions(prev => [...prev, {
       id: newVersionId,
-      label: `${changedFragment?.text} → ${newText}`,
+      label: `Shifted: ${changedFragment?.text} → ${newText}`,
       fragments: updatedFragments,
       timestamp: "Just now"
     }])
@@ -351,11 +399,18 @@ export default function AIWorkspace() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleExampleClick = () => {
+    setUserInput(featuredExample.prompt)
+  }
+
   const currentThinkingMessage = hasSubmitted && currentThinkingIndex < thinkingSequence.length 
     ? thinkingSequence[currentThinkingIndex] 
     : null
 
   const analysisComplete = currentThinkingIndex >= thinkingSequence.length
+
+  // Get dimensions that could be further shaped
+  const shapableDimensions = clarificationDimensions.filter(d => !d.isPresent && d.options)
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -372,10 +427,10 @@ export default function AIWorkspace() {
         className={cn(
           "h-screen flex flex-col border-r border-border/30 relative transition-all duration-700 ease-out",
           showPromptWorkspace 
-            ? "w-[24%] min-w-[280px] max-w-[320px]" 
+            ? "w-[22%] min-w-[260px] max-w-[300px]" 
             : showExploration 
-              ? "w-[32%] min-w-[320px] max-w-[400px]" 
-              : "w-[40%] min-w-[400px] max-w-[600px]"
+              ? "w-[30%] min-w-[300px] max-w-[380px]" 
+              : "w-[40%] min-w-[400px] max-w-[560px]"
         )}
       >
         {/* Header */}
@@ -386,41 +441,48 @@ export default function AIWorkspace() {
             </div>
             <div>
               <h1 className="text-sm font-medium text-foreground">AIONE</h1>
-              <p className="text-xs text-muted-foreground">Prompt Agent</p>
+              <p className="text-[11px] text-muted-foreground">Creative Clarification</p>
             </div>
           </div>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-5">
+        <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-6">
           {!hasSubmitted ? (
             <div className="h-full flex flex-col justify-center">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <p className="text-foreground/90 text-sm leading-relaxed">
-                    What kind of visual do you want to create?
-                  </p>
-                  <p className="text-muted-foreground/70 text-xs">
-                    Describe a mood, scene, or atmosphere.
+              <div className="space-y-8">
+                {/* Hero Language */}
+                <div className="space-y-3">
+                  <h2 className="text-xl font-medium text-foreground leading-tight">
+                    Bring vague ideas into focus
+                  </h2>
+                  <p className="text-sm text-muted-foreground/80 leading-relaxed">
+                    Clarify visual ideas through collaborative exploration. Turn half-formed intuitions into clear creative direction.
                   </p>
                 </div>
                 
-                {/* Inspiration starters */}
-                <div className="space-y-2">
-                  <p className="text-muted-foreground/50 text-[10px] uppercase tracking-wider">
-                    Try one of these
+                {/* Featured Example */}
+                <div className="space-y-3">
+                  <button
+                    onClick={handleExampleClick}
+                    className={cn(
+                      "w-full text-left p-5 rounded-2xl transition-all duration-300",
+                      "bg-gradient-to-br from-muted/40 via-muted/20 to-transparent",
+                      "border border-border/40 hover:border-primary/30",
+                      "hover:bg-gradient-to-br hover:from-primary/5 hover:via-muted/20 hover:to-transparent",
+                      "group"
+                    )}
+                  >
+                    <p className="text-sm text-foreground/90 leading-relaxed mb-3 group-hover:text-foreground transition-colors">
+                      {featuredExample.prompt}
+                    </p>
+                    <span className="text-[11px] text-primary/70 group-hover:text-primary transition-colors">
+                      {featuredExample.label}
+                    </span>
+                  </button>
+                  <p className="text-[11px] text-muted-foreground/50 text-center">
+                    Click to use as starting point
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {inspirationStarters.map((starter) => (
-                      <button
-                        key={starter}
-                        onClick={() => setUserInput(starter)}
-                        className="px-3 py-1.5 rounded-full text-xs bg-muted/30 border border-border/40 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
-                      >
-                        {starter}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>
@@ -455,9 +517,9 @@ export default function AIWorkspace() {
               {analysisComplete && (
                 <div className="pt-2 animate-fade-in">
                   <span className="text-xs text-muted-foreground/60">
-                    {selectedDirection 
-                      ? "Refining prompt..."
-                      : "Select a direction to continue."
+                    {selectedVibe 
+                      ? "Shaping your direction..."
+                      : "Choose an interpretation to continue."
                     }
                   </span>
                 </div>
@@ -486,7 +548,7 @@ export default function AIWorkspace() {
                     handleSubmit(e)
                   }
                 }}
-                placeholder="Describe a mood, scene, or visual idea..."
+                placeholder="Describe a mood, atmosphere, or visual feeling..."
                 disabled={hasSubmitted}
                 rows={3}
                 className="w-full bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none resize-none"
@@ -510,17 +572,17 @@ export default function AIWorkspace() {
         </div>
       </div>
 
-      {/* Center Panel - Exploration Workspace */}
+      {/* Center Panel - Creative Clarification Workspace */}
       <div 
         className={cn(
           "h-screen overflow-y-auto scrollbar-hide border-r border-border/30 transition-all duration-700",
           showExploration ? "opacity-100" : "opacity-0 pointer-events-none",
-          showPromptWorkspace ? "w-[36%] min-w-[380px]" : "flex-1"
+          showPromptWorkspace ? "w-[38%] min-w-[400px]" : "flex-1"
         )}
       >
         <div className={cn(
-          "p-8 space-y-6",
-          showPromptWorkspace ? "max-w-lg" : "max-w-xl mx-auto"
+          "p-8 space-y-8",
+          showPromptWorkspace ? "max-w-lg" : "max-w-2xl mx-auto"
         )}>
           
           {/* Section Header */}
@@ -530,60 +592,54 @@ export default function AIWorkspace() {
               explorationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <h2 className="text-base font-medium text-foreground mb-1">Explore</h2>
-            <p className="text-xs text-muted-foreground">Choose a creative direction</p>
+            <h2 className="text-lg font-medium text-foreground mb-1">Shape Your Vision</h2>
+            <p className="text-sm text-muted-foreground/80">Clarify and deepen the creative direction</p>
           </div>
 
-          {/* Missing Dimensions - Compact */}
+          {/* Creative Clarification - Soft surfacing of shapable dimensions */}
           <div 
             className={cn(
               "transition-all duration-500",
               explorationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <div className="grid grid-cols-2 gap-2">
-              {dimensions.map((dimension, index) => (
+            <p className="text-[11px] text-muted-foreground/60 mb-3">
+              Ways to deepen the direction
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {shapableDimensions.map((dimension, index) => (
                 <div 
                   key={dimension.id}
                   className={cn(
-                    "transition-all duration-300",
+                    "relative transition-all duration-300",
                     explorationPhase >= 2 ? "opacity-100" : "opacity-0"
                   )}
-                  style={{ transitionDelay: `${index * 60}ms` }}
+                  style={{ transitionDelay: `${index * 50}ms` }}
                 >
                   <button
                     onClick={() => setExpandedDimension(expandedDimension === dimension.id ? null : dimension.id)}
                     className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all",
+                      "px-3 py-1.5 rounded-full text-xs transition-all",
                       "border",
                       dimension.selectedOption
                         ? "bg-primary/10 border-primary/30 text-foreground"
-                        : "bg-muted/20 border-border/40 text-muted-foreground hover:border-primary/20 hover:text-foreground"
+                        : "bg-muted/20 border-border/40 text-muted-foreground hover:border-primary/20 hover:text-foreground hover:bg-muted/30"
                     )}
                   >
-                    <span className={cn(
-                      "transition-colors",
-                      dimension.selectedOption ? "text-primary" : "text-muted-foreground/60"
-                    )}>
-                      {dimension.icon}
-                    </span>
-                    <span className="flex-1 text-left truncate">
-                      {dimension.selectedOption || dimension.label}
-                    </span>
-                    <ChevronDown className={cn(
-                      "w-3 h-3 transition-transform flex-shrink-0",
-                      expandedDimension === dimension.id && "rotate-180"
-                    )} />
+                    {dimension.selectedOption || dimension.label}
                   </button>
                   
-                  {expandedDimension === dimension.id && (
-                    <div className="mt-1.5 p-1.5 rounded-lg bg-muted/20 border border-border/30 animate-expand">
+                  {expandedDimension === dimension.id && dimension.options && (
+                    <div className="absolute z-20 left-0 top-full mt-2 min-w-[200px] p-2 rounded-xl bg-card border border-border/50 shadow-xl animate-expand">
+                      <p className="px-2 py-1 text-[10px] text-muted-foreground/60 mb-1">
+                        {dimension.description}
+                      </p>
                       {dimension.options.map((option) => (
                         <button
                           key={option}
                           onClick={() => handleDimensionSelect(dimension.id, option)}
                           className={cn(
-                            "w-full px-2.5 py-1.5 rounded text-[11px] text-left transition-all",
+                            "w-full px-3 py-2 rounded-lg text-xs text-left transition-all",
                             "hover:bg-primary/10 hover:text-primary",
                             dimension.selectedOption === option
                               ? "bg-primary/10 text-primary"
@@ -600,96 +656,87 @@ export default function AIWorkspace() {
             </div>
           </div>
 
-          {/* Creative Direction Cards - 4 strong visual directions */}
+          {/* Vibe Interpretations - Organic atmospheric grid */}
           <div 
             className={cn(
               "transition-all duration-500",
               explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-3">
-              Creative Directions
+            <p className="text-[11px] text-muted-foreground/60 mb-4">
+              Visual interpretations
             </p>
+            
+            {/* Organic staggered grid */}
             <div className={cn(
-              "grid gap-3 transition-all duration-500",
-              showPromptWorkspace ? "grid-cols-1" : "grid-cols-2"
+              "grid gap-3",
+              showPromptWorkspace ? "grid-cols-2" : "grid-cols-4"
             )}>
-            {directions.map((direction, index) => {
-              const isSelected = selectedDirection === direction.id
-              const isDimmed = selectedDirection && !isSelected
+              {vibeInterpretations.map((vibe, index) => {
+                const isSelected = selectedVibe === vibe.id
+                const isDimmed = selectedVibe && !isSelected
+                
+                // Stagger heights for organic feel
+                const heightVariants = ["h-28", "h-32", "h-24", "h-30", "h-26", "h-34", "h-28", "h-32"]
+                const height = heightVariants[index % heightVariants.length]
 
-              return (
-                <button
-                  key={direction.id}
-                  onClick={() => handleDirectionSelect(direction.id)}
-                  className={cn(
-                    "w-full text-left rounded-2xl transition-all duration-500 overflow-hidden",
-                    "border group",
-                    explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
-                    isSelected && "border-primary/50 scale-[1.02] shadow-lg shadow-primary/10",
-                    isDimmed && "opacity-30 scale-[0.97] saturate-50",
-                    !isSelected && !isDimmed && "border-border/40 hover:border-primary/30"
-                  )}
-                  style={{ transitionDelay: `${index * 80}ms` }}
-                >
-                  {/* Visual Preview */}
-                  <div className={cn(
-                    "h-16 relative overflow-hidden transition-all duration-500",
-                    `bg-gradient-to-br ${direction.previewGradient}`,
-                    isSelected && "h-20"
-                  )}>
-                    {/* Atmospheric overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
-                    
-                    {/* Mood elements */}
+                return (
+                  <button
+                    key={vibe.id}
+                    onClick={() => handleVibeSelect(vibe.id)}
+                    className={cn(
+                      "relative text-left rounded-xl transition-all duration-500 overflow-hidden group",
+                      height,
+                      explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
+                      isSelected && "ring-2 ring-primary/60 scale-[1.02]",
+                      isDimmed && "opacity-30 scale-[0.97] saturate-50",
+                      !isSelected && !isDimmed && "hover:scale-[1.02]"
+                    )}
+                    style={{ transitionDelay: `${index * 60}ms` }}
+                  >
+                    {/* Gradient background */}
                     <div className={cn(
-                      "absolute inset-0 opacity-30",
-                      direction.previewAccent === "cyan" && "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan-400/20 via-transparent to-transparent",
-                      direction.previewAccent === "amber" && "bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-amber-400/20 via-transparent to-transparent",
-                      direction.previewAccent === "slate" && "bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-400/10 via-transparent to-transparent"
+                      "absolute inset-0 bg-gradient-to-br transition-all duration-500",
+                      vibe.gradient
                     )} />
+                    
+                    {/* Accent glow */}
+                    <div className={cn(
+                      "absolute w-24 h-24 rounded-full blur-2xl transition-opacity duration-500",
+                      "bg-white/10",
+                      vibe.accentPosition === "top-right" && "top-0 right-0 -translate-y-1/2 translate-x-1/2",
+                      vibe.accentPosition === "top-left" && "top-0 left-0 -translate-y-1/2 -translate-x-1/2",
+                      vibe.accentPosition === "center" && "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+                      vibe.accentPosition === "bottom" && "bottom-0 left-1/2 translate-y-1/2 -translate-x-1/2",
+                      vibe.accentPosition === "bottom-left" && "bottom-0 left-0 translate-y-1/2 -translate-x-1/2",
+                      isSelected ? "opacity-60" : "opacity-30 group-hover:opacity-50"
+                    )} />
+                    
+                    {/* Content overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                     
                     {/* Selection indicator */}
                     {isSelected && (
-                      <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary flex items-center justify-center animate-scale-in">
-                        <Check className="w-3.5 h-3.5 text-primary-foreground" />
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center animate-scale-in">
+                        <Check className="w-3 h-3 text-primary-foreground" />
                       </div>
                     )}
-                  </div>
-                  
-                  {/* Content */}
-                  <div className={cn(
-                    "p-4 space-y-2 transition-all",
-                    isSelected && "p-5"
-                  )}>
-                    <div className="flex items-center justify-between">
-                      <h4 className={cn(
-                        "font-medium text-sm transition-colors",
-                        isSelected ? "text-primary" : "text-foreground"
-                      )}>
-                        {direction.title}
-                      </h4>
-                      <span className={cn(
-                        "text-[10px] px-2 py-0.5 rounded-full transition-colors",
-                        isSelected 
-                          ? "bg-primary/20 text-primary" 
-                          : "bg-muted/50 text-muted-foreground"
-                      )}>
-                        {direction.alignmentLabel}
-                      </span>
-                    </div>
                     
-                    <p className={cn(
-                      "text-xs leading-relaxed transition-colors",
-                      isSelected ? "text-foreground/70" : "text-muted-foreground",
-                      isDimmed && "line-clamp-1"
-                    )}>
-                      {direction.description}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
+                    {/* Label */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                      <p className={cn(
+                        "text-xs font-medium text-white/90 mb-0.5 transition-colors",
+                        isSelected && "text-white"
+                      )}>
+                        {vibe.label}
+                      </p>
+                      <p className="text-[10px] text-white/50 line-clamp-1">
+                        {vibe.atmosphere}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -714,8 +761,8 @@ export default function AIWorkspace() {
               promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <h2 className="text-base font-medium text-foreground mb-0.5">Prompt</h2>
-            <p className="text-xs text-muted-foreground">Click highlighted regions to refine</p>
+            <h2 className="text-lg font-medium text-foreground mb-0.5">Refine</h2>
+            <p className="text-sm text-muted-foreground/80">Click highlighted elements to explore variations</p>
           </div>
 
           {/* Interactive Prompt - The Main Steering Interface */}
@@ -726,7 +773,7 @@ export default function AIWorkspace() {
             )}
           >
             <div className="relative rounded-2xl bg-muted/10 border border-border/30 p-6 group">
-              <p className="text-sm leading-[1.8] text-foreground/90">
+              <p className="text-sm leading-[1.9] text-foreground/90">
                 {getCurrentFragments().map((fragment) => {
                   if (!fragment.isEditable) {
                     return <span key={fragment.id}>{fragment.text}</span>
@@ -761,9 +808,9 @@ export default function AIWorkspace() {
                       {/* Semantic reinterpretation options */}
                       {isExpanded && fragment.alternatives && (
                         <span className="absolute z-10 left-0 top-full mt-2 animate-expand">
-                          <span className="flex flex-col gap-0.5 p-2 rounded-xl bg-card border border-border/50 shadow-xl min-w-[200px]">
-                            <span className="px-2 py-1.5 text-[10px] text-muted-foreground">
-                              Explore different interpretations
+                          <span className="flex flex-col gap-0.5 p-2 rounded-xl bg-card border border-border/50 shadow-xl min-w-[220px]">
+                            <span className="px-2 py-1.5 text-[10px] text-muted-foreground/70">
+                              Reimagine this element
                             </span>
                             {fragment.alternatives.map((alt) => (
                               <button
@@ -810,7 +857,7 @@ export default function AIWorkspace() {
           >
             <div className="flex items-center gap-2">
               <Clock className="w-3 h-3 text-muted-foreground/60" />
-              <h3 className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
+              <h3 className="text-xs font-medium text-muted-foreground/60">
                 Evolution
               </h3>
             </div>
@@ -850,7 +897,7 @@ export default function AIWorkspace() {
                           </span>
                           {isLatest && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/20 text-primary">
-                              Latest
+                              Current
                             </span>
                           )}
                         </div>
