@@ -217,6 +217,7 @@ function getAlternativesForFragment(text: string): string[] {
 
 export default function AIWorkspace() {
   const [userInput, setUserInput] = useState("")
+  const [submittedPrompt, setSubmittedPrompt] = useState("")
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [currentThinkingIndex, setCurrentThinkingIndex] = useState(0)
@@ -358,7 +359,10 @@ export default function AIWorkspace() {
     e.preventDefault()
     if (!userInput.trim() || hasSubmitted) return
     
-    setMessages([{ id: "user-1", type: "user", content: userInput.trim() }])
+    const prompt = userInput.trim()
+    setSubmittedPrompt(prompt)
+    setMessages([{ id: "user-1", type: "user", content: prompt }])
+    setUserInput("") // Clear input after submission
     setHasSubmitted(true)
     setCurrentThinkingIndex(0)
   }, [userInput, hasSubmitted])
@@ -564,43 +568,61 @@ export default function AIWorkspace() {
 
         {/* Input Area */}
         <div className="px-6 py-5 border-t border-border/30">
-          <form onSubmit={handleSubmit}>
-            <div className={cn(
-              "relative rounded-2xl transition-all duration-300",
-              "bg-muted/40 border border-border/50",
-              "focus-within:border-primary/40 focus-within:bg-muted/50",
-              hasSubmitted && "opacity-50 pointer-events-none"
-            )}>
-              <textarea
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSubmit(e)
-                  }
-                }}
-                placeholder="Describe a mood, atmosphere, or visual feeling..."
-                disabled={hasSubmitted}
-                rows={3}
-                className="w-full bg-transparent px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none"
-              />
-              <div className="absolute bottom-2.5 right-2.5">
-                <button
-                  type="submit"
-                  disabled={!userInput.trim() || hasSubmitted}
-                  className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
-                    userInput.trim() && !hasSubmitted
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "bg-muted text-muted-foreground/30"
-                  )}
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+          {!hasSubmitted ? (
+            <form onSubmit={handleSubmit}>
+              <div className={cn(
+                "relative rounded-2xl transition-all duration-300",
+                "bg-muted/40 border border-border/50",
+                "focus-within:border-primary/40 focus-within:bg-muted/50"
+              )}>
+                <textarea
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSubmit(e)
+                    }
+                  }}
+                  placeholder="Describe a mood, atmosphere, or visual feeling..."
+                  rows={3}
+                  className="w-full bg-transparent px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none"
+                />
+                <div className="absolute bottom-2.5 right-2.5">
+                  <button
+                    type="submit"
+                    disabled={!userInput.trim()}
+                    className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                      userInput.trim()
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "bg-muted text-muted-foreground/30"
+                    )}
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <div className="relative rounded-2xl bg-muted/20 border border-border/30 p-4">
+                <p className="text-xs text-muted-foreground mb-2">Your creative starting point</p>
+                <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
+                  {submittedPrompt}
+                </p>
+              </div>
+              <div className="relative rounded-2xl bg-muted/40 border border-border/50 transition-all focus-within:border-primary/40 focus-within:bg-muted/50">
+                <textarea
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  placeholder="Add another mood, layer, or refinement..."
+                  rows={2}
+                  className="w-full bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none"
+                />
               </div>
             </div>
-          </form>
+          )}
         </div>
       </div>
 
@@ -662,26 +684,33 @@ export default function AIWorkspace() {
                   </button>
                   
                   {expandedDimension === dimension.id && dimension.options && (
-                    <div className="absolute z-30 left-0 top-full mt-2 min-w-[240px] p-3 rounded-xl bg-card border border-border/60 shadow-2xl animate-expand">
-                      <p className="px-2 py-1.5 text-xs text-muted-foreground mb-2">
-                        {dimension.description}
-                      </p>
-                      {dimension.options.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => handleDimensionSelect(dimension.id, option)}
-                          className={cn(
-                            "w-full px-3 py-2.5 rounded-lg text-sm text-left transition-all",
-                            "hover:bg-primary/15 hover:text-primary",
-                            dimension.selectedOption === option
-                              ? "bg-primary/15 text-primary font-medium"
-                              : "text-foreground"
-                          )}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      {/* Backdrop to capture clicks and close dropdown */}
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setExpandedDimension(null)}
+                      />
+                      <div className="absolute z-50 left-0 top-full mt-2 min-w-[260px] p-3 rounded-xl bg-popover border border-border shadow-2xl animate-expand">
+                        <p className="px-2 py-1.5 text-xs text-muted-foreground mb-2">
+                          {dimension.description}
+                        </p>
+                        {dimension.options.map((option) => (
+                          <button
+                            key={option}
+                            onClick={() => handleDimensionSelect(dimension.id, option)}
+                            className={cn(
+                              "w-full px-3 py-2.5 rounded-lg text-sm text-left transition-all",
+                              "hover:bg-primary/15 hover:text-primary",
+                              dimension.selectedOption === option
+                                ? "bg-primary/15 text-primary font-medium"
+                                : "text-foreground"
+                            )}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               ))}
@@ -839,29 +868,39 @@ export default function AIWorkspace() {
                       
                       {/* Semantic reinterpretation options */}
                       {isExpanded && fragment.alternatives && (
-                        <span className="absolute z-30 left-0 top-full mt-2 animate-expand">
-                          <span className="flex flex-col gap-0.5 p-3 rounded-xl bg-card border border-border/60 shadow-2xl min-w-[240px]">
-                            <span className="px-2 py-1.5 text-xs text-muted-foreground">
-                              Reimagine this element
+                        <>
+                          {/* Backdrop to capture clicks */}
+                          <span 
+                            className="fixed inset-0 z-40"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedFragment(null)
+                            }}
+                          />
+                          <span className="absolute z-50 left-0 top-full mt-2 animate-expand">
+                            <span className="flex flex-col gap-0.5 p-3 rounded-xl bg-popover border border-border shadow-2xl min-w-[260px]">
+                              <span className="px-2 py-1.5 text-xs text-muted-foreground">
+                                Reimagine this element
+                              </span>
+                              {fragment.alternatives.map((alt) => (
+                                <button
+                                  key={alt}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleFragmentChange(fragment.id, alt)
+                                  }}
+                                  className={cn(
+                                    "px-3 py-2.5 rounded-lg text-sm text-left transition-all",
+                                    "hover:bg-primary/15 hover:text-primary",
+                                    "text-foreground"
+                                  )}
+                                >
+                                  {alt}
+                                </button>
+                              ))}
                             </span>
-                            {fragment.alternatives.map((alt) => (
-                              <button
-                                key={alt}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleFragmentChange(fragment.id, alt)
-                                }}
-                                className={cn(
-                                  "px-3 py-2.5 rounded-lg text-sm text-left transition-all",
-                                  "hover:bg-primary/15 hover:text-primary",
-                                  "text-foreground"
-                                )}
-                              >
-                                {alt}
-                              </button>
-                            ))}
                           </span>
-                        </span>
+                        </>
                       )}
                     </span>
                   )
