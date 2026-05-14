@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
-import { Send, Sparkles, Lightbulb } from "lucide-react"
+import { Send, Lightbulb } from "lucide-react"
 
 // This component is evolving from an initial submission form into a persistent AI collaboration input dock.
 // It now supports ongoing conversational interaction with the AI creative collaborator.
@@ -44,17 +44,6 @@ export function IntentInput({ onSubmit, isProcessing, examplePrompt, value, onCh
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">AIONE</h1>
-          <p className="text-xs text-muted-foreground">Prompt Agent</p>
-        </div>
-      </div>
-
       {/* Input Area */}
       <form onSubmit={handleSubmit}>
         <div className={cn(
