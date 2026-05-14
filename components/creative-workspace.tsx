@@ -36,10 +36,10 @@ export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
   }, [isVisible, selectedDirection])
 
   return (
-    <div className="h-screen flex">
+    <div className="workspace-shell">
       <div className={cn(
-        "h-screen overflow-y-auto scrollbar-hide border-r border-border/30 transition-all duration-700",
-        isVisible ? "w-[38%] min-w-[400px]" : "w-0 opacity-0 pointer-events-none"
+        "workspace-side-panel",
+        isVisible ? "w-[56%] min-w-[500px]" : "w-0 opacity-0 pointer-events-none"
       )}>
         <SemanticSteering
           isVisible={isVisible}
@@ -48,9 +48,9 @@ export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
       </div>
 
       <div className={cn(
-        "h-screen overflow-y-auto scrollbar-hide transition-all duration-700 ease-out",
+        "workspace-main-panel",
         showPromptWorkspace
-          ? "w-[40%] min-w-[420px] opacity-100 translate-x-0"
+          ? "w-[44%] min-w-[420px] opacity-100 translate-x-0"
           : "w-0 opacity-0 translate-x-8 pointer-events-none"
       )}>
         <PromptEvolution

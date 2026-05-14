@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
-import { Copy, Check } from "lucide-react"
+import { Copy, Check, Pencil } from "lucide-react"
 import { parsePromptToFragments } from "@/lib/prompt-parser"
 import { getAlternativesForFragment } from "@/lib/semantic-alternatives"
 import { PromptFragment, PromptVersion } from "@/types/ai-workspace"
@@ -31,6 +31,9 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
   const [recentlyChanged, setRecentlyChanged] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [promptPhase, setPromptPhase] = useState(0)
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false)
+  const [editPromptText, setEditPromptText] = useState("")
+  const [editBaseFragments, setEditBaseFragments] = useState<PromptFragment[]>([])
 
   useEffect(() => {
     if (!initialPrompt) {
@@ -38,6 +41,9 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
       setActiveVersion(null)
       setWorkingFragments([])
       setHasUnsavedChanges(false)
+      setIsEditingPrompt(false)
+      setEditPromptText("")
+      setEditBaseFragments([])
       return
     }
 
@@ -56,6 +62,9 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
     setHasUnsavedChanges(false)
     setExpandedFragment(null)
     setRecentlyChanged(null)
+    setIsEditingPrompt(false)
+    setEditPromptText(fragments.map(fragment => fragment.text).join(""))
+    setEditBaseFragments(fragments)
   }, [initialPrompt, initialLabel])
 
   useEffect(() => {
@@ -80,7 +89,51 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
     return []
   }
 
-  const getPromptString = () => getCurrentFragments().map(fragment => fragment.text).join("")
+  const getPromptString = () => isEditingPrompt ? editPromptText : getCurrentFragments().map(fragment => fragment.text).join("")
+
+  const createFragmentsFromText = (text: string, previousFragments: PromptFragment[]) => {
+    const editableFragments = previousFragments.filter(fragment => fragment.isEditable && fragment.text.trim())
+    const nextFragments: PromptFragment[] = []
+    let cursor = 0
+    let id = 0
+
+    editableFragments.forEach(fragment => {
+      const matchIndex = text.indexOf(fragment.text, cursor)
+      if (matchIndex === -1) return
+
+      if (matchIndex > cursor) {
+        nextFragments.push({
+          id: `f${id++}`,
+          text: text.slice(cursor, matchIndex),
+          isEditable: false
+        })
+      }
+
+      nextFragments.push({
+        ...fragment,
+        id: `f${id++}`,
+        alternatives: getAlternativesForFragment(fragment.text)
+      })
+      cursor = matchIndex + fragment.text.length
+    })
+
+    if (cursor < text.length) {
+      nextFragments.push({
+        id: `f${id++}`,
+        text: text.slice(cursor),
+        isEditable: false
+      })
+    }
+
+    return nextFragments.length > 0 ? nextFragments : [{ id: "f0", text, isEditable: false }]
+  }
+
+  const handlePromptTextChange = (text: string) => {
+    setEditPromptText(text)
+    setWorkingFragments(createFragmentsFromText(text, editBaseFragments.length > 0 ? editBaseFragments : getCurrentFragments()))
+    setHasUnsavedChanges(true)
+    setExpandedFragment(null)
+  }
 
   const handleFragmentChange = (fragmentId: string, newText: string) => {
     const currentFragments = getCurrentFragments()
@@ -116,6 +169,8 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
 
     setActiveVersion(newVersionId)
     setHasUnsavedChanges(false)
+    setIsEditingPrompt(false)
+    setEditBaseFragments(workingFragments)
   }
 
   const handleCopyPrompt = () => {
@@ -132,47 +187,41 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
   const currentFragments = getCurrentFragments()
 
   return (
-    <div className="h-full flex flex-col animate-slide-in-left opacity-0">
-      <div className={cn(
-        "transition-all duration-500",
-        promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-      )}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-medium text-foreground">Prompt Evolution</h2>
-            {currentVersion && (
-              <span className="px-2 py-0.5 rounded-md bg-primary/15 text-primary text-xs font-medium">
-                {currentVersion.label.includes("Initial") ? "V1" : `V${promptVersions.findIndex(v => v.id === currentVersion.id) + 1}`}
-              </span>
-            )}
+    <div className="workspace-panel animate-slide-in-left opacity-0 h-full">
+      <div className="workspace-panel-header">
+        <div className={cn(
+          "transition-all duration-500",
+          promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+        )}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="workspace-panel-title">Prompt Evolution</h2>
+                {currentVersion && (
+                  <span className="px-2 py-0.5 rounded-md bg-primary/15 text-primary text-xs font-medium">
+                    {currentVersion.label.includes("Initial") ? "V1" : `V${promptVersions.findIndex(v => v.id === currentVersion.id) + 1}`}
+                  </span>
+                )}
+              </div>
+              <p className="workspace-panel-subtitle">Tune your prompt here</p>
+            </div>
           </div>
-
-          <button
-            onClick={handleCopyPrompt}
-            disabled={!currentVersion}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors disabled:opacity-50"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-chart-3" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                Copy
-              </>
-            )}
-          </button>
         </div>
       </div>
 
-      <div className={cn(
-        "transition-all duration-500",
-        promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-      )}>
-        <div className="relative rounded-2xl bg-muted/15 border border-border/40 p-6 group">
-          <p className="text-sm leading-[2] text-foreground">
+      <div className="workspace-panel-section">
+        <div className={cn(
+          "workspace-panel-content transition-all duration-500",
+          promptPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+        )}>
+          {isEditingPrompt ? (
+            <textarea
+              value={editPromptText}
+              onChange={(event) => handlePromptTextChange(event.target.value)}
+              className="min-h-[9rem] w-full resize-none bg-transparent text-sm leading-[2.15] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+            />
+          ) : (
+            <p className="text-sm leading-[2.15] text-foreground">
             {currentFragments.length > 0 ? (
               currentFragments.map(fragment => {
                 if (!fragment.isEditable) {
@@ -206,9 +255,9 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
                     {isExpanded && fragment.alternatives && (
                       <>
                         <span className="fixed inset-0 z-40" onClick={() => setExpandedFragment(null)} />
-                        <span className="absolute z-50 left-0 top-full mt-2 animate-expand">
-                          <span className="flex flex-col gap-0.5 p-3 rounded-xl bg-popover border border-border shadow-2xl min-w-[260px]">
-                            <span className="px-2 py-1.5 text-xs text-muted-foreground">
+                        <span className="absolute z-50 left-0 top-full mt-3 animate-expand">
+                          <span className="flex flex-col gap-1 p-4 rounded-xl bg-popover border border-border shadow-2xl min-w-[280px]">
+                            <span className="px-2 py-2 text-xs text-muted-foreground">
                               Reimagine this element
                             </span>
                             {fragment.alternatives.map(alt => (
@@ -235,30 +284,61 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
                 Select an interpretation to generate prompt content.
               </span>
             )}
-          </p>
+            </p>
+          )}
 
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            {hasUnsavedChanges && (
-              <button
-                onClick={handleSaveCheckpoint}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
-              >
-                <span className="text-[10px]">Save</span>
-              </button>
-            )}
+          <div className="mt-6 flex items-center justify-end gap-1.5">
+            <button
+              onClick={handleCopyPrompt}
+              disabled={!currentVersion}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors disabled:opacity-50"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-chart-3" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setExpandedFragment(null)
+                if (!isEditingPrompt) {
+                  const fragments = getCurrentFragments()
+                  setEditPromptText(fragments.map(fragment => fragment.text).join(""))
+                  setEditBaseFragments(fragments)
+                }
+                setIsEditingPrompt(prev => !prev)
+              }}
+              disabled={!currentVersion}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors disabled:opacity-50",
+                isEditingPrompt && "text-foreground bg-muted/30"
+              )}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              {isEditingPrompt ? "Done" : "Edit"}
+            </button>
           </div>
         </div>
       </div>
 
-      <div className={cn(
-        "space-y-4 transition-all duration-500",
-        promptPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-      )}>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Saved Directions</span>
-        </div>
+      <div className="workspace-panel-section">
+        <div className={cn(
+          "workspace-panel-content space-y-5 transition-all duration-500",
+          promptPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+        )}>
+          <div className="flex items-center gap-2">
+            <span className="workspace-section-title">Saved Directions</span>
+          </div>
 
-        <div className="relative pl-5 border-l-2 border-border/40 space-y-3">
+          <div className="relative pl-6 border-l-2 border-border/40 space-y-3.5">
           {promptVersions.filter(v => v.isCheckpoint).map((version, index, filtered) => {
             const isActive = activeVersion === version.id
             const isLatest = index === filtered.length - 1
@@ -270,17 +350,22 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
                   setActiveVersion(version.id)
                   setWorkingFragments(version.fragments)
                   setHasUnsavedChanges(false)
+                  setIsEditingPrompt(false)
+                  setEditPromptText(version.fragments.map(fragment => fragment.text).join(""))
+                  setEditBaseFragments(version.fragments)
                 }}
                 className={cn(
-                  "relative w-full text-left pl-4 py-2.5 rounded-r-lg transition-all",
-                  isActive ? "bg-primary/10" : "hover:bg-muted/30"
+                  "group relative w-full text-left transition-all"
                 )}
               >
                 <div className={cn(
-                  "absolute -left-[25px] top-3.5 w-3.5 h-3.5 rounded-full border-2 transition-colors",
+                  "absolute -left-[29px] top-4 w-3.5 h-3.5 rounded-full border-2 transition-colors",
                   isActive ? "bg-primary border-primary" : "bg-background border-border"
                 )} />
-                <div className="flex items-start justify-between gap-2">
+                <div className={cn(
+                  "ml-5 inline-flex max-w-[calc(100%-1.25rem)] items-start justify-between gap-3 rounded-r-lg px-5 py-3 transition-all align-top",
+                  isActive ? "bg-primary/10" : "group-hover:bg-muted/30"
+                )}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn(
@@ -295,7 +380,7 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{version.label}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{version.label}</p>
                   </div>
                   <span className="text-xs text-muted-foreground flex-shrink-0">{version.timestamp}</span>
                 </div>
@@ -304,6 +389,7 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
           })}
         </div>
       </div>
+    </div>
     </div>
   )
 }

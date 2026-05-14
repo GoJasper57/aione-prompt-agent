@@ -126,52 +126,50 @@ export function ConversationShell({ onAnalysisComplete }: ConversationShellProps
   const analysisCompleteLabel = hasSubmitted && currentThinkingIndex >= thinkingSequence.length
 
   return (
-    <div className="h-screen flex flex-col border-r border-border/30 relative transition-all duration-700 ease-out w-[40%] min-w-[400px] max-w-[560px]">
-      <div className="px-6 py-5 border-b border-border/30">
+    <div className="workspace-panel border-r border-border/30 relative transition-all duration-700 ease-out w-[40%] min-w-[400px] max-w-[560px]">
+      <div className="workspace-panel-header border-b border-border/30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <Sparkles className="w-4.5 h-4.5 text-primary" />
           </div>
           <div>
-            <h1 className="text-base font-semibold text-foreground">AIONE</h1>
-            <p className="text-xs text-muted-foreground">Creative Clarification</p>
+            <h1 className="workspace-panel-title">AIONE</h1>
+            <p className="workspace-panel-subtitle">Creative Clarification</p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-6">
+      <div className="workspace-panel-section flex-1 overflow-y-auto scrollbar-hide">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col justify-center">
-            <div className="space-y-8">
-              <div className="space-y-3">
-                <h2 className="text-2xl font-semibold text-foreground leading-tight">
-                  Bring vague ideas into focus
-                </h2>
-                <p className="text-base text-muted-foreground leading-relaxed">
-                  Clarify visual ideas through collaborative exploration. Turn half-formed intuitions into clear creative direction.
-                </p>
-              </div>
+          <div className="h-full flex flex-col justify-center space-y-7">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold text-foreground leading-tight">
+                Bring vague ideas into focus
+              </h2>
+              <p className="workspace-panel-subtitle">
+                Clarify visual ideas through collaborative exploration. Turn half-formed intuitions into clear creative direction.
+              </p>
+            </div>
 
-              <div className="space-y-3">
-                <button
-                  onClick={handleExampleClick}
-                  className="w-full text-left p-5 rounded-2xl transition-all duration-300 bg-gradient-to-br from-muted/50 via-muted/30 to-transparent border border-border/50 hover:border-primary/40 hover:bg-gradient-to-br hover:from-primary/10 hover:via-muted/30 hover:to-transparent group"
-                >
-                  <p className="text-sm text-foreground leading-relaxed mb-3 group-hover:text-foreground transition-colors">
-                    {featuredExample.prompt}
-                  </p>
-                  <span className="text-xs text-primary/80 font-medium group-hover:text-primary transition-colors">
-                    {featuredExample.label}
-                  </span>
-                </button>
-                <p className="text-xs text-muted-foreground text-center">
-                  Click to use as starting point
+            <div className="space-y-4">
+              <button
+                onClick={handleExampleClick}
+                className="w-full text-left p-6 rounded-2xl transition-all duration-300 bg-gradient-to-br from-muted/50 via-muted/30 to-transparent border border-border/50 hover:border-primary/40 hover:bg-gradient-to-br hover:from-primary/10 hover:via-muted/30 hover:to-transparent group"
+              >
+                <p className="text-sm text-foreground leading-relaxed mb-4 group-hover:text-foreground transition-colors">
+                  {featuredExample.prompt}
                 </p>
-              </div>
+                <span className="text-xs text-primary/80 font-medium group-hover:text-primary transition-colors">
+                  {featuredExample.label}
+                </span>
+              </button>
+              <p className="workspace-muted">
+                Click to use as starting point
+              </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-6">
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             ))}
@@ -190,7 +188,7 @@ export function ConversationShell({ onAnalysisComplete }: ConversationShellProps
 
             {analysisCompleteLabel && (
               <div className="pt-2 animate-fade-in">
-                <span className="text-xs text-muted-foreground/60">
+                <span className="workspace-muted">
                   {showAnalysisHint ? "Shaping your direction..." : "Choose an interpretation to continue."}
                 </span>
               </div>
@@ -201,7 +199,7 @@ export function ConversationShell({ onAnalysisComplete }: ConversationShellProps
         )}
       </div>
 
-      <div className="px-6 py-5 border-t border-border/30">
+      <div className="workspace-panel-section border-t border-border/30">
         <IntentInput
           onSubmit={handleSubmit}
           isProcessing={isStreaming}

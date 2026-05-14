@@ -323,3 +323,128 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Workspace design system */
+.workspace-section-title {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: oklch(0.65 0.01 260 / 0.45);
+  margin-bottom: 0.875rem;
+}
+
+.workspace-subtitle {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: oklch(0.65 0.01 260 / 0.72);
+}
+
+.workspace-muted {
+  color: oklch(0.65 0.01 260 / 0.65);
+}
+
+.workspace-panel-gap > * + * {
+  margin-top: 2.25rem;
+}
+
+.workspace-card {
+  background: oklch(0.15 0.005 260 / 0.16);
+  border: 1px solid oklch(0.22 0.01 260 / 0.25);
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+}
+
+.workspace-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 0.525rem;
+}
+
+.workspace-card-description {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: oklch(0.65 0.01 260 / 0.72);
+}
+
+.workspace-shell {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  gap: 0;
+}
+
+.workspace-side-panel,
+.workspace-main-panel {
+  height: 100vh;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  transition: all 0.7s ease-out;
+}
+
+.workspace-side-panel {
+  border-right: 1px solid oklch(0.22 0.01 260 / 0.3);
+}
+
+.workspace-side-panel::-webkit-scrollbar,
+.workspace-main-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+  padding: 2.5rem;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.workspace-panel-header {
+  margin-bottom: 2.375rem;
+}
+
+.workspace-panel-section {
+  margin-bottom: 2.375rem;
+}
+
+.workspace-panel-section:last-child {
+  margin-bottom: 0;
+}
+
+.workspace-panel-section > * + * {
+  margin-top: 1.75rem;
+}
+
+.workspace-panel-content {
+  position: relative;
+  padding: 2rem;
+  background: oklch(0.15 0.005 260 / 0.16);
+  border: 1px solid oklch(0.22 0.01 260 / 0.25);
+  border-radius: 1.5rem;
+}
+
+.workspace-panel-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 0.525rem;
+}
+
+.workspace-panel-subtitle {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: oklch(0.65 0.01 260 / 0.72);
+}
+
+.workspace-interpretation-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  transition: transform 0.5s ease, opacity 0.5s ease;
+  height: 14.5rem;
+}

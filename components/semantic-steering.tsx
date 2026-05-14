@@ -51,28 +51,30 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
 
   return (
     <div className={cn(
-      "h-screen overflow-y-auto scrollbar-hide transition-all duration-700",
+      "workspace-panel transition-all duration-700",
       isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
     )}>
-      <div className="p-8 space-y-10">
+      <div className="workspace-panel-header">
         <div className={cn(
           "transition-all duration-500",
           explorationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         )}>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Shape Your Vision</h2>
-          <p className="text-sm text-muted-foreground">
-            Clarify and deepen the creative direction before you evolve the prompt.
+          <h2 className="workspace-panel-title">Shape Your Vision</h2>
+          <p className="workspace-panel-subtitle">
+            Explore moods, atmospheres, and creative possibilities.
           </p>
         </div>
+      </div>
 
+      <div className="workspace-panel-section">
         <div className={cn(
-          "transition-all duration-500 pb-6 border-b border-border/30",
+          "workspace-panel-content transition-all duration-500 pb-8 border-b border-border/30",
           explorationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         )}>
-          <p className="text-xs font-medium text-muted-foreground mb-4 uppercase tracking-wide">
+          <p className="workspace-section-title">
             Structural Dimensions
           </p>
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap gap-3">
             {shapableDimensions.map((dimension, index) => (
               <div 
                 key={dimension.id}
@@ -98,8 +100,8 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
                 {expandedDimension === dimension.id && dimension.options && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setExpandedDimension(null)} />
-                    <div className="absolute z-50 left-0 top-full mt-2 min-w-[260px] p-3 rounded-xl bg-popover border border-border shadow-2xl animate-expand">
-                      <p className="px-2 py-1.5 text-xs text-muted-foreground mb-2">
+                    <div className="absolute z-50 left-0 top-full mt-2 min-w-[260px] workspace-card animate-expand">
+                      <p className="workspace-card-description mb-2">
                         {dimension.description}
                       </p>
                       {dimension.options.map(option => (
@@ -121,29 +123,28 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
             ))}
           </div>
         </div>
+      </div>
 
+      <div className="workspace-panel-section">
         <div className={cn(
-          "transition-all duration-500",
+          "workspace-panel-content transition-all duration-500",
           explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         )}>
-          <p className="text-xs font-medium text-muted-foreground mb-4 uppercase tracking-wide">
+          <p className="workspace-section-title">
             Emotional Interpretations
           </p>
 
-          <div className="grid gap-3 grid-cols-2">
+          <div className="grid gap-4 grid-cols-2">
             {vibeInterpretations.map((vibe, index) => {
               const isSelected = selectedVibe === vibe.id
               const isDimmed = selectedVibe && !isSelected
-              const heightVariants = ["h-28", "h-32", "h-24", "h-30", "h-26", "h-34", "h-28", "h-32"]
-              const height = heightVariants[index % heightVariants.length]
 
               return (
                 <button
                   key={vibe.id}
                   onClick={() => handleVibeSelect(vibe.id)}
                   className={cn(
-                    "relative text-left rounded-xl transition-all duration-500 overflow-hidden group",
-                    height,
+                    "workspace-interpretation-card text-left group",
                     isSelected && "ring-2 ring-primary/60 scale-[1.02]",
                     isDimmed && "opacity-30 scale-[0.97] saturate-50",
                     !isSelected && !isDimmed && "hover:scale-[1.02]"
@@ -165,11 +166,11 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
                   )} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                   {isSelected && (
-                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center animate-scale-in">
+                    <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary flex items-center justify-center animate-scale-in">
                       <Check className="w-3 h-3 text-primary-foreground" />
                     </div>
                   )}
-                  <div className="absolute bottom-0 left-0 right-0 p-3.5">
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
                     <p className={cn(
                       "text-sm font-medium text-white mb-0.5 transition-colors",
                       isSelected && "text-white"
