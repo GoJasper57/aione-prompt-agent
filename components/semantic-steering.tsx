@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { Check } from "lucide-react"
 import { clarificationFramework } from "@/data/clarification-framework"
@@ -15,8 +16,23 @@ interface SemanticSteeringProps {
 export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteeringProps) {
   const [clarificationDimensions, setClarificationDimensions] = useState<ClarificationDimension[]>(clarificationFramework)
   const [expandedDimension, setExpandedDimension] = useState<string | null>(null)
+  const [dimensionMenuPosition, setDimensionMenuPosition] = useState<{ left: number; top: number } | null>(null)
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null)
   const [explorationPhase, setExplorationPhase] = useState(0)
+
+  const buildPromptDirection = (vibeId: string | null, dimensions: ClarificationDimension[]) => {
+    const vibe = vibeInterpretations.find(v => v.id === vibeId) ?? vibeInterpretations[0]
+    const selectedOptions = dimensions
+      .filter(dimension => dimension.selectedOption)
+      .map(dimension => `[${dimension.selectedOption}]`)
+
+    return {
+      label: vibe.label,
+      promptTemplate: selectedOptions.length > 0
+        ? `${vibe.promptTemplate} Semantic steering: ${selectedOptions.join(", ")}.`
+        : vibe.promptTemplate
+    }
+  }
 
   useEffect(() => {
     if (!isVisible) {
@@ -33,21 +49,46 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
     return () => timers.forEach(clearTimeout)
   }, [isVisible])
 
+  useEffect(() => {
+    if (!isVisible) return
+    onSelectDirection(buildPromptDirection(selectedVibe, clarificationDimensions))
+  }, [isVisible, selectedVibe, clarificationDimensions, onSelectDirection])
+
   const handleDimensionSelect = (dimensionId: string, option: string) => {
-    setClarificationDimensions(prev => prev.map(d =>
-      d.id === dimensionId ? { ...d, selectedOption: option, isPresent: true } : d
-    ))
+    setClarificationDimensions(prev => {
+      return prev.map(d =>
+        d.id === dimensionId
+          ? {
+              ...d,
+              selectedOption: d.selectedOption === option ? undefined : option,
+              isPresent: d.selectedOption === option ? false : true
+            }
+          : d
+      )
+    })
     setExpandedDimension(null)
+    setDimensionMenuPosition(null)
+  }
+
+  const handleDimensionMenuToggle = (dimensionId: string, element: HTMLButtonElement) => {
+    if (expandedDimension === dimensionId) {
+      setExpandedDimension(null)
+      setDimensionMenuPosition(null)
+      return
+    }
+
+    const rect = element.getBoundingClientRect()
+    setExpandedDimension(dimensionId)
+    setDimensionMenuPosition({ left: rect.left, top: rect.bottom + 8 })
   }
 
   const handleVibeSelect = (vibeId: string) => {
     const isCurrentlySelected = selectedVibe === vibeId
-    const selected = vibeInterpretations.find(v => v.id === vibeId)
-    setSelectedVibe(isCurrentlySelected ? null : vibeId)
-    onSelectDirection(isCurrentlySelected ? null : selected ? { promptTemplate: selected.promptTemplate, label: selected.label } : null)
+    const nextVibe = isCurrentlySelected ? null : vibeId
+    setSelectedVibe(nextVibe)
   }
 
-  const shapableDimensions = clarificationDimensions.filter(d => !d.isPresent && d.options)
+  const shapableDimensions = clarificationDimensions.filter(d => d.options)
 
   return (
     <div className={cn(
@@ -85,7 +126,7 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
                 style={{ transitionDelay: `${index * 50}ms` }}
               >
                 <button
-                  onClick={() => setExpandedDimension(expandedDimension === dimension.id ? null : dimension.id)}
+                  onClick={(event) => handleDimensionMenuToggle(dimension.id, event.currentTarget)}
                   className={cn(
                     "px-3.5 py-2 rounded-xl text-sm transition-all",
                     "border",
@@ -97,11 +138,20 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
                   {dimension.selectedOption || dimension.label}
                 </button>
 
-                {expandedDimension === dimension.id && dimension.options && (
+                {expandedDimension === dimension.id && dimension.options && dimensionMenuPosition && createPortal(
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setExpandedDimension(null)} />
-                    <div className="absolute z-50 left-0 top-full mt-2 min-w-[260px] workspace-card animate-expand">
-                      <p className="workspace-card-description mb-2">
+                    <div
+                      className="workspace-overlay-backdrop fixed inset-0"
+                      onClick={() => {
+                        setExpandedDimension(null)
+                        setDimensionMenuPosition(null)
+                      }}
+                    />
+                    <div
+                      className="workspace-overlay workspace-semantic-overlay fixed w-[210px] animate-expand"
+                      style={{ left: dimensionMenuPosition.left, top: dimensionMenuPosition.top }}
+                    >
+                      <p className="workspace-semantic-overlay-title">
                         {dimension.description}
                       </p>
                       {dimension.options.map(option => (
@@ -109,15 +159,16 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
                           key={option}
                           onClick={() => handleDimensionSelect(dimension.id, option)}
                           className={cn(
-                            "w-full px-3 py-2.5 rounded-lg text-sm text-left transition-all hover:bg-primary/15 hover:text-primary",
-                            dimension.selectedOption === option ? "bg-primary/15 text-primary font-medium" : "text-foreground"
+                            "workspace-semantic-overlay-item",
+                            dimension.selectedOption === option && "workspace-semantic-overlay-item-active"
                           )}
                         >
                           {option}
                         </button>
                       ))}
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
               </div>
             ))}

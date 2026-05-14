@@ -378,11 +378,79 @@
 
 .workspace-side-panel,
 .workspace-main-panel {
+  position: relative;
+  z-index: 0;
   height: 100vh;
   min-width: 0;
   overflow-y: auto;
   scrollbar-width: none;
   transition: all 0.7s ease-out;
+}
+
+.workspace-side-panel:has(.workspace-overlay),
+.workspace-main-panel:has(.workspace-overlay) {
+  z-index: 900;
+}
+
+.workspace-overlay {
+  z-index: 1000;
+}
+
+.workspace-overlay-backdrop {
+  z-index: 990;
+}
+
+.workspace-semantic-overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem;
+  border-radius: 0.875rem;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 60px oklch(0 0 0 / 0.32);
+}
+
+.workspace-semantic-overlay-title {
+  padding: 0.375rem 0.5rem 0.5rem;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.workspace-semantic-overlay-item {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--foreground);
+  transition: all 0.2s ease;
+}
+
+.workspace-semantic-overlay-item:hover {
+  background: oklch(0.75 0.14 195 / 0.15);
+  color: var(--primary);
+}
+
+.workspace-semantic-overlay-item-active {
+  background: oklch(0.75 0.14 195 / 0.15);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="context-menu-content"],
+[data-slot="context-menu-sub-content"],
+[data-slot="hover-card-content"],
+[data-slot="menubar-content"],
+[data-slot="menubar-sub-content"],
+[data-slot="tooltip-content"] {
+  z-index: 1000;
 }
 
 .workspace-side-panel {

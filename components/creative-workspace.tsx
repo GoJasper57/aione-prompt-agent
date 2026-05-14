@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { PromptEvolution } from "@/components/prompt-evolution"
 import { SemanticSteering } from "@/components/semantic-steering"
@@ -17,6 +17,9 @@ interface CreativeWorkspaceProps {
 export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
   const [selectedDirection, setSelectedDirection] = useState<WorkspaceDirection | null>(null)
   const [showPromptWorkspace, setShowPromptWorkspace] = useState(false)
+  const handleSelectDirection = useCallback((value: WorkspaceDirection | null) => {
+    setSelectedDirection(value)
+  }, [])
 
   useEffect(() => {
     if (!isVisible) {
@@ -25,15 +28,12 @@ export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
       return
     }
 
-    if (selectedDirection) {
-      const timer = setTimeout(() => {
-        setShowPromptWorkspace(true)
-      }, 300)
-      return () => clearTimeout(timer)
-    }
+    const timer = setTimeout(() => {
+      setShowPromptWorkspace(true)
+    }, 420)
 
-    setShowPromptWorkspace(false)
-  }, [isVisible, selectedDirection])
+    return () => clearTimeout(timer)
+  }, [isVisible])
 
   return (
     <div className="workspace-shell">
@@ -43,7 +43,7 @@ export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
       )}>
         <SemanticSteering
           isVisible={isVisible}
-          onSelectDirection={(value) => setSelectedDirection(value)}
+          onSelectDirection={handleSelectDirection}
         />
       </div>
 

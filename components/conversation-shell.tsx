@@ -103,6 +103,8 @@ export function ConversationShell({ onAnalysisComplete }: ConversationShellProps
       setSubmittedPrompt(prompt)
       setMessages([{ id: "user-1", type: "user", content: prompt }])
       setHasSubmitted(true)
+      setAnalysisComplete(true)
+      onAnalysisComplete()
       setCurrentThinkingIndex(0)
     } else {
       const newMessage: Message = {

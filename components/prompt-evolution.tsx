@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { Copy, Check, Pencil } from "lucide-react"
 import { parsePromptToFragments } from "@/lib/prompt-parser"
@@ -13,12 +14,12 @@ interface PromptEvolutionProps {
   isVisible: boolean
 }
 
-const checkpointLabels = [
-  "Refined direction",
-  "Atmospheric adjustment",
-  "Tonal shift",
-  "Creative evolution",
-  "Mood refinement"
+const snapshotLabels = [
+  "Expanded atmospheric detail",
+  "Added cinematic lighting direction",
+  "Refined emotional tone",
+  "Introduced softer visual pacing",
+  "Captured semantic checkpoint"
 ]
 
 export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: PromptEvolutionProps) {
@@ -28,6 +29,7 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
   const [copied, setCopied] = useState(false)
   const [hoveredFragment, setHoveredFragment] = useState<string | null>(null)
   const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
+  const [fragmentMenuPosition, setFragmentMenuPosition] = useState<{ left: number; top: number } | null>(null)
   const [recentlyChanged, setRecentlyChanged] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [promptPhase, setPromptPhase] = useState(0)
@@ -44,23 +46,26 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
       setIsEditingPrompt(false)
       setEditPromptText("")
       setEditBaseFragments([])
+      setFragmentMenuPosition(null)
       return
     }
 
     const fragments = parsePromptToFragments(initialPrompt)
-    setPromptVersions([
+    setPromptVersions(prev => [
       {
         id: "v1",
         label: `Initial ${initialLabel ?? "direction"} direction`,
         fragments,
         timestamp: "Just now",
         isCheckpoint: true
-      }
+      },
+      ...prev.filter(version => version.id !== "v1")
     ])
     setActiveVersion("v1")
     setWorkingFragments(fragments)
     setHasUnsavedChanges(false)
     setExpandedFragment(null)
+    setFragmentMenuPosition(null)
     setRecentlyChanged(null)
     setIsEditingPrompt(false)
     setEditPromptText(fragments.map(fragment => fragment.text).join(""))
@@ -133,6 +138,7 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
     setWorkingFragments(createFragmentsFromText(text, editBaseFragments.length > 0 ? editBaseFragments : getCurrentFragments()))
     setHasUnsavedChanges(true)
     setExpandedFragment(null)
+    setFragmentMenuPosition(null)
   }
 
   const handleFragmentChange = (fragmentId: string, newText: string) => {
@@ -146,22 +152,23 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
     setWorkingFragments(updatedFragments)
     setHasUnsavedChanges(true)
     setExpandedFragment(null)
+    setFragmentMenuPosition(null)
     setRecentlyChanged(fragmentId)
     setTimeout(() => setRecentlyChanged(null), 1500)
   }
 
-  const handleSaveCheckpoint = () => {
-    if (!hasUnsavedChanges || workingFragments.length === 0) return
+  const createPromptSnapshot = () => {
+    const fragments = getCurrentFragments()
+    if (fragments.length === 0) return
 
-    const newVersionId = `v${promptVersions.length + 1}`
-    const label = checkpointLabels[promptVersions.length % checkpointLabels.length]
+    const newVersionId = `v${Date.now()}`
 
     setPromptVersions(prev => [
       ...prev,
       {
         id: newVersionId,
-        label,
-        fragments: workingFragments,
+        label: snapshotLabels[prev.length % snapshotLabels.length],
+        fragments,
         timestamp: "Just now",
         isCheckpoint: true
       }
@@ -169,17 +176,26 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
 
     setActiveVersion(newVersionId)
     setHasUnsavedChanges(false)
-    setIsEditingPrompt(false)
-    setEditBaseFragments(workingFragments)
+    setEditBaseFragments(fragments)
   }
 
   const handleCopyPrompt = () => {
     navigator.clipboard.writeText(getPromptString())
     setCopied(true)
-    if (hasUnsavedChanges) {
-      handleSaveCheckpoint()
-    }
+    createPromptSnapshot()
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleFragmentMenuToggle = (fragmentId: string, element: HTMLButtonElement) => {
+    if (expandedFragment === fragmentId) {
+      setExpandedFragment(null)
+      setFragmentMenuPosition(null)
+      return
+    }
+
+    const rect = element.getBoundingClientRect()
+    setExpandedFragment(fragmentId)
+    setFragmentMenuPosition({ left: rect.left, top: rect.bottom + 12 })
   }
 
   if (!isVisible) return null
@@ -234,12 +250,12 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
 
                 return (
                   <span key={fragment.id} className="relative inline">
-                    <button
-                      onMouseEnter={() => setHoveredFragment(fragment.id)}
-                      onMouseLeave={() => !isExpanded && setHoveredFragment(null)}
-                      onClick={() => setExpandedFragment(isExpanded ? null : fragment.id)}
+                      <button
+                        onMouseEnter={() => setHoveredFragment(fragment.id)}
+                        onMouseLeave={() => !isExpanded && setHoveredFragment(null)}
+                        onClick={(event) => handleFragmentMenuToggle(fragment.id, event.currentTarget)}
                       className={cn(
-                        "relative px-1.5 -mx-0.5 rounded transition-all duration-300 bg-primary/10 border-b-2 border-primary/30 hover:bg-primary/20 hover:border-primary/50",
+                        "relative px-1 py-0 -mx-0.5 rounded transition-all duration-300 bg-primary/10 border-b border-primary/30 leading-tight hover:bg-primary/20 hover:border-primary/50",
                         isExpanded && "bg-primary/25 border-primary/60 ring-1 ring-primary/30",
                         wasChanged && "animate-pulse bg-chart-4/20 border-chart-4/40"
                       )}
@@ -252,12 +268,21 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
                       </span>
                     </button>
 
-                    {isExpanded && fragment.alternatives && (
+                    {isExpanded && fragment.alternatives && fragmentMenuPosition && createPortal(
                       <>
-                        <span className="fixed inset-0 z-40" onClick={() => setExpandedFragment(null)} />
-                        <span className="absolute z-50 left-0 top-full mt-3 animate-expand">
-                          <span className="flex flex-col gap-1 p-4 rounded-xl bg-popover border border-border shadow-2xl min-w-[280px]">
-                            <span className="px-2 py-2 text-xs text-muted-foreground">
+                        <span
+                          className="workspace-overlay-backdrop fixed inset-0"
+                          onClick={() => {
+                            setExpandedFragment(null)
+                            setFragmentMenuPosition(null)
+                          }}
+                        />
+                        <span
+                          className="workspace-overlay fixed animate-expand"
+                          style={{ left: fragmentMenuPosition.left, top: fragmentMenuPosition.top }}
+                        >
+                          <span className="workspace-semantic-overlay w-[220px]">
+                            <span className="workspace-semantic-overlay-title">
                               Reimagine this element
                             </span>
                             {fragment.alternatives.map(alt => (
@@ -267,14 +292,15 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
                                   e.stopPropagation()
                                   handleFragmentChange(fragment.id, alt)
                                 }}
-                                className="px-3 py-2.5 rounded-lg text-sm text-left transition-all hover:bg-primary/15 hover:text-primary text-foreground"
+                                className="workspace-semantic-overlay-item"
                               >
                                 {alt}
                               </button>
                             ))}
                           </span>
                         </span>
-                      </>
+                      </>,
+                      document.body
                     )}
                   </span>
                 )
