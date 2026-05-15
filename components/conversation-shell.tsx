@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from "react"
 import { Sparkles } from "lucide-react"
 import { IntentInput } from "@/components/intent-input"
+import { classifyRequest } from "@/lib/intelligence/classifyRequest"
 import { Message } from "@/types/ai-workspace"
 
 interface ConversationShellProps {
   onAnalysisComplete: () => void
+  onNewSession: () => string
 }
 
 const featuredExample = {
@@ -16,10 +18,10 @@ const featuredExample = {
 
 const thinkingSequence: Message[] = [
   { id: "t1", type: "ai-insight", content: "I can see the emotional atmosphere you're reaching for." },
-  { id: "t2", type: "ai-transition", content: "Let me help you clarify and shape this further." },
+  { id: "t2", type: "ai-transition", content: "Explore visual directions on the right to refine and evolve your prompt." },
 ]
 
-export function ConversationShell({ onAnalysisComplete }: ConversationShellProps) {
+export function ConversationShell({ onAnalysisComplete, onNewSession }: ConversationShellProps) {
   const [userInput, setUserInput] = useState("")
   const [submittedPrompt, setSubmittedPrompt] = useState("")
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -98,6 +100,33 @@ export function ConversationShell({ onAnalysisComplete }: ConversationShellProps
   const handleSubmit = (intent: string) => {
     if (!intent.trim()) return
     const prompt = intent.trim()
+    const classification = classifyRequest(prompt, submittedPrompt || undefined)
+
+    if (!classification.isAllowed) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `safety-${Date.now()}`,
+          type: "ai-transition",
+          content: "This request cannot be explored here."
+        }
+      ])
+      setUserInput("")
+      return
+    }
+
+    if (!classification.isRelevant) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `relevance-${Date.now()}`,
+          type: "ai-transition",
+          content: "AIONE currently supports creative prompt exploration."
+        }
+      ])
+      setUserInput("")
+      return
+    }
 
     if (!hasSubmitted) {
       setSubmittedPrompt(prompt)
@@ -106,6 +135,24 @@ export function ConversationShell({ onAnalysisComplete }: ConversationShellProps
       setAnalysisComplete(true)
       onAnalysisComplete()
       setCurrentThinkingIndex(0)
+    } else if (classification.isNewSession) {
+      const archivedVersionName = onNewSession()
+      setSubmittedPrompt(prompt)
+      setMessages([
+        {
+          id: `archive-${Date.now()}`,
+          type: "ai-transition",
+          content: `Archived previous version as ${archivedVersionName}.`
+        },
+        {
+          id: `user-${Date.now()}`,
+          type: "user",
+          content: prompt
+        }
+      ])
+      setCurrentThinkingIndex(0)
+      setThinkingSession(prev => prev + 1)
+      setStreamedContent("")
     } else {
       const newMessage: Message = {
         id: `user-${Date.now()}`,
@@ -113,6 +160,7 @@ export function ConversationShell({ onAnalysisComplete }: ConversationShellProps
         content: prompt
       }
       setMessages(prev => [...prev, newMessage])
+      setSubmittedPrompt(prompt)
       setCurrentThinkingIndex(0)
       setThinkingSession(prev => prev + 1)
       setStreamedContent("")
