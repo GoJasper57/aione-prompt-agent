@@ -3,12 +3,15 @@
 import { useState, useEffect, useRef } from "react"
 import { Sparkles } from "lucide-react"
 import { IntentInput } from "@/components/intent-input"
+import { analyzePrompt, PromptAnalysis } from "@/lib/intelligence/analyzePrompt"
 import { classifyRequest } from "@/lib/intelligence/classifyRequest"
-import { Message } from "@/types/ai-workspace"
+import { Message, SessionMessage } from "@/types/ai-workspace"
 
 interface ConversationShellProps {
   onAnalysisComplete: () => void
   onNewSession: () => string
+  onPromptAnalyzed: (analysis: PromptAnalysis) => void
+  onMessagesChange: (messages: SessionMessage[]) => void
 }
 
 const featuredExample = {
@@ -21,7 +24,7 @@ const thinkingSequence: Message[] = [
   { id: "t2", type: "ai-transition", content: "Explore visual directions on the right to refine and evolve your prompt." },
 ]
 
-export function ConversationShell({ onAnalysisComplete, onNewSession }: ConversationShellProps) {
+export function ConversationShell({ onAnalysisComplete, onNewSession, onPromptAnalyzed, onMessagesChange }: ConversationShellProps) {
   const [userInput, setUserInput] = useState("")
   const [submittedPrompt, setSubmittedPrompt] = useState("")
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -41,6 +44,18 @@ export function ConversationShell({ onAnalysisComplete, onNewSession }: Conversa
   useEffect(() => {
     scrollToBottom()
   }, [messages, streamedContent])
+
+  useEffect(() => {
+    onMessagesChange(messages.map(message => ({
+      role: message.type === "user"
+        ? "user"
+        : message.id.startsWith("archive-")
+          ? "system"
+          : "assistant",
+      content: message.content,
+      timestamp: message.timestamp
+    })))
+  }, [messages, onMessagesChange])
 
   const streamText = (text: string, onComplete: () => void) => {
     setIsStreaming(true)
@@ -67,7 +82,8 @@ export function ConversationShell({ onAnalysisComplete, onNewSession }: Conversa
     const currentMessage = thinkingSequence[currentThinkingIndex]
     const keyedMessage = {
       ...currentMessage,
-      id: `${currentMessage.id}-${thinkingSession}`
+      id: `${currentMessage.id}-${thinkingSession}`,
+      timestamp: Date.now()
     }
 
     let followUpTimer: ReturnType<typeof setTimeout> | null = null
@@ -106,9 +122,16 @@ export function ConversationShell({ onAnalysisComplete, onNewSession }: Conversa
       setMessages(prev => [
         ...prev,
         {
+          id: `user-${Date.now()}`,
+          type: "user",
+          content: prompt,
+          timestamp: Date.now()
+        },
+        {
           id: `safety-${Date.now()}`,
           type: "ai-transition",
-          content: "This request cannot be explored here."
+          content: "AIONE currently supports safe creative prompt exploration.",
+          timestamp: Date.now()
         }
       ])
       setUserInput("")
@@ -119,18 +142,27 @@ export function ConversationShell({ onAnalysisComplete, onNewSession }: Conversa
       setMessages(prev => [
         ...prev,
         {
+          id: `user-${Date.now()}`,
+          type: "user",
+          content: prompt,
+          timestamp: Date.now()
+        },
+        {
           id: `relevance-${Date.now()}`,
           type: "ai-transition",
-          content: "AIONE currently supports creative prompt exploration."
+          content: "AIONE currently supports creative prompt exploration.",
+          timestamp: Date.now()
         }
       ])
       setUserInput("")
       return
     }
 
+    onPromptAnalyzed(analyzePrompt(prompt))
+
     if (!hasSubmitted) {
       setSubmittedPrompt(prompt)
-      setMessages([{ id: "user-1", type: "user", content: prompt }])
+      setMessages([{ id: "user-1", type: "user", content: prompt, timestamp: Date.now() }])
       setHasSubmitted(true)
       setAnalysisComplete(true)
       onAnalysisComplete()
@@ -138,16 +170,19 @@ export function ConversationShell({ onAnalysisComplete, onNewSession }: Conversa
     } else if (classification.isNewSession) {
       const archivedVersionName = onNewSession()
       setSubmittedPrompt(prompt)
-      setMessages([
+      setMessages(prev => [
+        ...prev,
         {
           id: `archive-${Date.now()}`,
           type: "ai-transition",
-          content: `Archived previous version as ${archivedVersionName}.`
+          content: `Archived previous version as ${archivedVersionName}.`,
+          timestamp: Date.now()
         },
         {
           id: `user-${Date.now()}`,
           type: "user",
-          content: prompt
+          content: prompt,
+          timestamp: Date.now()
         }
       ])
       setCurrentThinkingIndex(0)
@@ -157,7 +192,8 @@ export function ConversationShell({ onAnalysisComplete, onNewSession }: Conversa
       const newMessage: Message = {
         id: `user-${Date.now()}`,
         type: "user",
-        content: prompt
+        content: prompt,
+        timestamp: Date.now()
       }
       setMessages(prev => [...prev, newMessage])
       setSubmittedPrompt(prompt)

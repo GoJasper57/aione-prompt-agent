@@ -6,14 +6,40 @@ import { cn } from "@/lib/utils"
 import { Check } from "lucide-react"
 import { clarificationFramework } from "@/data/clarification-framework"
 import { vibeInterpretations } from "@/data/vibe-interpretations"
+import { PromptAnalysis } from "@/lib/intelligence/analyzePrompt"
 import { ClarificationDimension } from "@/types/ai-workspace"
 
 interface SemanticSteeringProps {
   isVisible: boolean
+  analysis: PromptAnalysis | null
   onSelectDirection: (direction: { promptTemplate: string; label: string } | null) => void
 }
 
-export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteeringProps) {
+const analyzedDimensionMeta: Record<string, { label: string; description: string }> = {
+  environment: { label: "Environment", description: "Where this takes place" },
+  character: { label: "Character", description: "Who or what is present" },
+  emotion: { label: "Emotion", description: "The feeling it carries" },
+  motion: { label: "Motion", description: "How stillness or movement behaves" },
+  materiality: { label: "Materiality", description: "What surfaces and forms are made of" },
+  atmosphere: { label: "Atmosphere", description: "The surrounding sensory mood" },
+  worldLogic: { label: "World Logic", description: "The rules shaping the idea" },
+  time: { label: "Time", description: "When or what era it inhabits" },
+  scale: { label: "Scale", description: "How intimate or vast it feels" },
+  interaction: { label: "Interaction", description: "How elements relate or respond" }
+}
+
+const buildAnalyzedDimensions = (analysis: PromptAnalysis): ClarificationDimension[] =>
+  Object.entries(analysis.dimensionAnalysis)
+    .filter(([, strength]) => strength === "missing" || strength === "weak")
+    .map(([dimension]) => ({
+      id: dimension,
+      label: analyzedDimensionMeta[dimension]?.label ?? dimension,
+      description: analyzedDimensionMeta[dimension]?.description ?? "Creative steering direction",
+      isPresent: false,
+      options: analysis.steeringSuggestions[dimension]?.slice(0, 4) ?? []
+    }))
+
+export function SemanticSteering({ isVisible, analysis, onSelectDirection }: SemanticSteeringProps) {
   const [clarificationDimensions, setClarificationDimensions] = useState<ClarificationDimension[]>(clarificationFramework)
   const [expandedDimension, setExpandedDimension] = useState<string | null>(null)
   const [dimensionMenuPosition, setDimensionMenuPosition] = useState<{ left: number; top: number } | null>(null)
@@ -53,6 +79,20 @@ export function SemanticSteering({ isVisible, onSelectDirection }: SemanticSteer
     if (!isVisible) return
     onSelectDirection(buildPromptDirection(selectedVibe, clarificationDimensions))
   }, [isVisible, selectedVibe, clarificationDimensions, onSelectDirection])
+
+  useEffect(() => {
+    if (!analysis) return
+
+    setClarificationDimensions(prev => {
+      const previousSelections = new Map(prev.map(dimension => [dimension.id, dimension.selectedOption]))
+      return buildAnalyzedDimensions(analysis).map(dimension => ({
+        ...dimension,
+        selectedOption: dimension.options?.includes(previousSelections.get(dimension.id) ?? "")
+          ? previousSelections.get(dimension.id)
+          : undefined
+      }))
+    })
+  }, [analysis])
 
   const handleDimensionSelect = (dimensionId: string, option: string) => {
     setClarificationDimensions(prev => {

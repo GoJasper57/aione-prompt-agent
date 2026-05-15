@@ -6,12 +6,15 @@ import { cn } from "@/lib/utils"
 import { Copy, Check, Pencil } from "lucide-react"
 import { parsePromptToFragments } from "@/lib/prompt-parser"
 import { getAlternativesForFragment } from "@/lib/semantic-alternatives"
-import { PromptFragment, PromptVersion } from "@/types/ai-workspace"
+import { summarizePromptChange } from "@/lib/intelligence/summarizePromptChange"
+import { PromptFragment, PromptVersion, WorkspaceSession } from "@/types/ai-workspace"
 
 interface PromptEvolutionProps {
   initialPrompt: string | null
   initialLabel: string | null
   isVisible: boolean
+  archivedSessions: WorkspaceSession[]
+  onPromptSnapshotChange: (promptSnapshot: string) => void
 }
 
 const snapshotLabels = [
@@ -22,7 +25,13 @@ const snapshotLabels = [
   "Captured semantic checkpoint"
 ]
 
-export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: PromptEvolutionProps) {
+export function PromptEvolution({
+  initialPrompt,
+  initialLabel,
+  isVisible,
+  archivedSessions,
+  onPromptSnapshotChange
+}: PromptEvolutionProps) {
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
   const [activeVersion, setActiveVersion] = useState<string | null>(null)
   const [workingFragments, setWorkingFragments] = useState<PromptFragment[]>([])
@@ -71,6 +80,37 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
     setEditPromptText(fragments.map(fragment => fragment.text).join(""))
     setEditBaseFragments(fragments)
   }, [initialPrompt, initialLabel])
+
+  useEffect(() => {
+    const archivedVersions = archivedSessions
+      .filter(session => session.promptSnapshot)
+      .map(session => ({
+        id: `session-${session.id}`,
+        label: session.versionLabel,
+        fragments: parsePromptToFragments(session.promptSnapshot),
+        timestamp: session.timestamp,
+        isCheckpoint: true,
+        sessionId: session.id,
+        promptSnapshot: session.promptSnapshot,
+        messages: session.messages,
+        changeLog: session.changeLog
+      }))
+
+    setPromptVersions(prev => [
+      ...archivedVersions,
+      ...prev.filter(version => !version.id.startsWith("session-"))
+    ])
+  }, [archivedSessions])
+
+  useEffect(() => {
+    const promptSnapshot = isEditingPrompt
+      ? editPromptText
+      : workingFragments.map(fragment => fragment.text).join("")
+
+    if (promptSnapshot) {
+      onPromptSnapshotChange(promptSnapshot)
+    }
+  }, [editPromptText, isEditingPrompt, workingFragments, onPromptSnapshotChange])
 
   useEffect(() => {
     if (!isVisible || !initialPrompt) {
@@ -162,6 +202,8 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
     if (fragments.length === 0) return
 
     const newVersionId = `v${Date.now()}`
+    const previousPrompt = currentVersion?.fragments.map(fragment => fragment.text).join("") ?? ""
+    const nextPrompt = fragments.map(fragment => fragment.text).join("")
 
     setPromptVersions(prev => [
       ...prev,
@@ -170,7 +212,8 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
         label: snapshotLabels[prev.length % snapshotLabels.length],
         fragments,
         timestamp: "Just now",
-        isCheckpoint: true
+        isCheckpoint: true,
+        changeLog: summarizePromptChange(previousPrompt, nextPrompt)
       }
     ])
 
@@ -407,6 +450,9 @@ export function PromptEvolution({ initialPrompt, initialLabel, isVisible }: Prom
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{version.label}</p>
+                    {version.changeLog && (
+                      <p className="text-xs text-muted-foreground/80 mt-1">{version.changeLog}</p>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground flex-shrink-0">{version.timestamp}</span>
                 </div>

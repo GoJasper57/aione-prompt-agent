@@ -1,18 +1,66 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { ConversationShell } from "@/components/conversation-shell"
 import { CreativeWorkspace } from "@/components/creative-workspace"
+import { PromptAnalysis } from "@/lib/intelligence/analyzePrompt"
+import { summarizePromptChange } from "@/lib/intelligence/summarizePromptChange"
+import { SessionMessage, WorkspaceSessionCollection } from "@/types/ai-workspace"
 
 export default function AIWorkspace() {
   const [analysisComplete, setAnalysisComplete] = useState(false)
   const [workspaceSessionId, setWorkspaceSessionId] = useState(0)
+  const [promptAnalysis, setPromptAnalysis] = useState<PromptAnalysis | null>(null)
+  const [workspaceSessions, setWorkspaceSessions] = useState<WorkspaceSessionCollection>({
+    currentSession: {
+      id: 0,
+      versionLabel: "Current",
+      timestamp: "Just now",
+      promptSnapshot: "",
+      messages: []
+    },
+    archivedSessions: []
+  })
 
   const handleNewSession = () => {
     const archivedVersionName = `V${workspaceSessionId + 1}`
+    setWorkspaceSessions(prev => ({
+      currentSession: {
+        id: workspaceSessionId + 1,
+        versionLabel: "Current",
+        timestamp: "Just now",
+        promptSnapshot: "",
+        messages: []
+      },
+      archivedSessions: [
+        ...prev.archivedSessions,
+        {
+          ...prev.currentSession,
+          versionLabel: archivedVersionName,
+          changeLog: summarizePromptChange(
+            prev.archivedSessions.at(-1)?.promptSnapshot ?? "",
+            prev.currentSession.promptSnapshot
+          )
+        }
+      ]
+    }))
     setWorkspaceSessionId(prev => prev + 1)
     return archivedVersionName
   }
+
+  const handleMessagesChange = useCallback((messages: SessionMessage[]) => {
+    setWorkspaceSessions(prev => ({
+      ...prev,
+      currentSession: { ...prev.currentSession, messages }
+    }))
+  }, [])
+
+  const handlePromptSnapshotChange = useCallback((promptSnapshot: string) => {
+    setWorkspaceSessions(prev => ({
+      ...prev,
+      currentSession: { ...prev.currentSession, promptSnapshot }
+    }))
+  }, [])
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -24,8 +72,16 @@ export default function AIWorkspace() {
       <ConversationShell
         onAnalysisComplete={() => setAnalysisComplete(true)}
         onNewSession={handleNewSession}
+        onPromptAnalyzed={setPromptAnalysis}
+        onMessagesChange={handleMessagesChange}
       />
-      <CreativeWorkspace key={workspaceSessionId} isVisible={analysisComplete} />
+      <CreativeWorkspace
+        key={workspaceSessionId}
+        isVisible={analysisComplete}
+        analysis={promptAnalysis}
+        archivedSessions={workspaceSessions.archivedSessions}
+        onPromptSnapshotChange={handlePromptSnapshotChange}
+      />
     </div>
   )
 }

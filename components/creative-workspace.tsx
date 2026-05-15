@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { PromptEvolution } from "@/components/prompt-evolution"
 import { SemanticSteering } from "@/components/semantic-steering"
+import { PromptAnalysis } from "@/lib/intelligence/analyzePrompt"
+import { WorkspaceSession } from "@/types/ai-workspace"
 
 interface WorkspaceDirection {
   promptTemplate: string
@@ -12,11 +14,15 @@ interface WorkspaceDirection {
 
 interface CreativeWorkspaceProps {
   isVisible: boolean
+  analysis: PromptAnalysis | null
+  archivedSessions: WorkspaceSession[]
+  onPromptSnapshotChange: (promptSnapshot: string) => void
 }
 
-export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
+export function CreativeWorkspace({ isVisible, analysis, archivedSessions, onPromptSnapshotChange }: CreativeWorkspaceProps) {
   const [selectedDirection, setSelectedDirection] = useState<WorkspaceDirection | null>(null)
   const [showPromptWorkspace, setShowPromptWorkspace] = useState(false)
+  const [promptAnalysis, setPromptAnalysis] = useState<PromptAnalysis | null>(analysis)
   const handleSelectDirection = useCallback((value: WorkspaceDirection | null) => {
     setSelectedDirection(value)
   }, [])
@@ -35,6 +41,16 @@ export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
     return () => clearTimeout(timer)
   }, [isVisible])
 
+  useEffect(() => {
+    setPromptAnalysis(analysis)
+  }, [analysis])
+
+  useEffect(() => {
+    if (selectedDirection?.promptTemplate) {
+      onPromptSnapshotChange(selectedDirection.promptTemplate)
+    }
+  }, [selectedDirection, onPromptSnapshotChange])
+
   return (
     <div className="workspace-shell">
       <div className={cn(
@@ -43,6 +59,7 @@ export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
       )}>
         <SemanticSteering
           isVisible={isVisible}
+          analysis={promptAnalysis}
           onSelectDirection={handleSelectDirection}
         />
       </div>
@@ -57,6 +74,8 @@ export function CreativeWorkspace({ isVisible }: CreativeWorkspaceProps) {
           initialPrompt={selectedDirection?.promptTemplate ?? null}
           initialLabel={selectedDirection?.label ?? null}
           isVisible={showPromptWorkspace}
+          archivedSessions={archivedSessions}
+          onPromptSnapshotChange={onPromptSnapshotChange}
         />
       </div>
     </div>

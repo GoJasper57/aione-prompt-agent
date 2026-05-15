@@ -1,0 +1,74 @@
+[
+  {
+    "concept": "urban loneliness",
+    "keywords": ["city", "urban", "alley", "alone", "lonely", "neon"],
+    "relatedDimensions": ["environment", "emotion", "atmosphere"],
+    "steeringSuggestions": ["ambient reflective surfaces", "soft atmospheric haze"]
+  },
+  {
+    "concept": "dreamlike nostalgia",
+    "keywords": ["dream", "dreamlike", "memory", "nostalgia", "faded", "remembered"],
+    "relatedDimensions": ["emotion", "atmosphere", "time"],
+    "steeringSuggestions": ["floating lantern fragments", "soft atmospheric haze"]
+  },
+  {
+    "concept": "organic surrealism",
+    "keywords": ["organic", "surreal", "living", "growth", "biomorphic", "roots"],
+    "relatedDimensions": ["materiality", "worldLogic", "environment"],
+    "steeringSuggestions": ["suspended organic structures", "translucent growth patterns"]
+  },
+  {
+    "concept": "playful absurdity",
+    "keywords": ["playful", "absurd", "whimsical", "strange", "impossible", "silly"],
+    "relatedDimensions": ["worldLogic", "interaction", "motion"],
+    "steeringSuggestions": ["unexpected scale shifts", "buoyant drifting objects"]
+  },
+  {
+    "concept": "forgotten futurism",
+    "keywords": ["future", "futuristic", "abandoned", "forgotten", "relic", "machine"],
+    "relatedDimensions": ["time", "materiality", "worldLogic"],
+    "steeringSuggestions": ["forgotten mechanical relics", "ambient reflective surfaces"]
+  },
+  {
+    "concept": "ancient mystery",
+    "keywords": ["ancient", "ruin", "temple", "myth", "artifact", "mystery"],
+    "relatedDimensions": ["time", "environment", "worldLogic"],
+    "steeringSuggestions": ["weathered ceremonial markings", "soft atmospheric haze"]
+  },
+  {
+    "concept": "soft intimacy",
+    "keywords": ["soft", "intimate", "tender", "gentle", "quiet", "warm"],
+    "relatedDimensions": ["emotion", "interaction", "atmosphere"],
+    "steeringSuggestions": ["diffused intimate light", "ambient reflective surfaces"]
+  },
+  {
+    "concept": "environmental decay",
+    "keywords": ["decay", "overgrown", "rust", "crumbling", "abandoned", "weathered"],
+    "relatedDimensions": ["environment", "materiality", "time"],
+    "steeringSuggestions": ["forgotten mechanical relics", "weathered layered textures"]
+  },
+  {
+    "concept": "cosmic wonder",
+    "keywords": ["cosmic", "stars", "galaxy", "planet", "celestial", "void"],
+    "relatedDimensions": ["scale", "environment", "atmosphere"],
+    "steeringSuggestions": ["suspended luminous particles", "vast layered horizons"]
+  },
+  {
+    "concept": "mythic wilderness",
+    "keywords": ["forest", "wilderness", "mythic", "beast", "grove", "wild"],
+    "relatedDimensions": ["environment", "character", "worldLogic"],
+    "steeringSuggestions": ["suspended organic structures", "ancient bioluminescent traces"]
+  },
+  {
+    "concept": "melancholic memory",
+    "keywords": ["melancholy", "memory", "loss", "echo", "fading", "longing"],
+    "relatedDimensions": ["emotion", "time", "atmosphere"],
+    "steeringSuggestions": ["soft atmospheric haze", "faint reflected echoes"]
+  },
+  {
+    "concept": "mechanical ritual",
+    "keywords": ["ritual", "machine", "clockwork", "mechanical", "ceremony", "automaton"],
+    "relatedDimensions": ["interaction", "materiality", "worldLogic"],
+    "steeringSuggestions": ["forgotten mechanical relics", "repeating kinetic gestures"]
+  }
+]

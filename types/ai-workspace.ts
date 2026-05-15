@@ -3,6 +3,27 @@ export interface Message {
   id: string
   type: "user" | "ai-insight" | "ai-transition"
   content: string
+  timestamp?: number
+}
+
+export interface SessionMessage {
+  role: "user" | "assistant" | "system"
+  content: string
+  timestamp?: number
+}
+
+export interface WorkspaceSession {
+  id: number
+  versionLabel: string
+  timestamp: string
+  promptSnapshot: string
+  messages: SessionMessage[]
+  changeLog?: string
+}
+
+export interface WorkspaceSessionCollection {
+  currentSession: WorkspaceSession
+  archivedSessions: WorkspaceSession[]
 }
 
 export interface ClarificationDimension {
@@ -37,4 +58,8 @@ export interface PromptVersion {
   fragments: PromptFragment[]
   timestamp: string
   isCheckpoint: boolean
+  sessionId?: number
+  promptSnapshot?: string
+  messages?: SessionMessage[]
+  changeLog?: string
 }
