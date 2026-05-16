@@ -11,6 +11,7 @@ export default function AIWorkspace() {
   const [analysisComplete, setAnalysisComplete] = useState(false)
   const [workspaceSessionId, setWorkspaceSessionId] = useState(0)
   const [promptAnalysis, setPromptAnalysis] = useState<PromptAnalysis | null>(null)
+  const [currentPrompt, setCurrentPrompt] = useState("")
   const [workspaceSessions, setWorkspaceSessions] = useState<WorkspaceSessionCollection>({
     currentSession: {
       id: 0,
@@ -73,11 +74,13 @@ export default function AIWorkspace() {
         onAnalysisComplete={() => setAnalysisComplete(true)}
         onNewSession={handleNewSession}
         onPromptAnalyzed={setPromptAnalysis}
+        onPromptSubmitted={setCurrentPrompt}
         onMessagesChange={handleMessagesChange}
       />
       <CreativeWorkspace
         key={workspaceSessionId}
         isVisible={analysisComplete}
+        currentPrompt={currentPrompt}
         analysis={promptAnalysis}
         archivedSessions={workspaceSessions.archivedSessions}
         onPromptSnapshotChange={handlePromptSnapshotChange}

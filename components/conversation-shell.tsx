@@ -11,6 +11,7 @@ interface ConversationShellProps {
   onAnalysisComplete: () => void
   onNewSession: () => string
   onPromptAnalyzed: (analysis: PromptAnalysis) => void
+  onPromptSubmitted: (prompt: string) => void
   onMessagesChange: (messages: SessionMessage[]) => void
 }
 
@@ -24,7 +25,13 @@ const thinkingSequence: Message[] = [
   { id: "t2", type: "ai-transition", content: "Explore visual directions on the right to refine and evolve your prompt." },
 ]
 
-export function ConversationShell({ onAnalysisComplete, onNewSession, onPromptAnalyzed, onMessagesChange }: ConversationShellProps) {
+export function ConversationShell({
+  onAnalysisComplete,
+  onNewSession,
+  onPromptAnalyzed,
+  onPromptSubmitted,
+  onMessagesChange
+}: ConversationShellProps) {
   const [userInput, setUserInput] = useState("")
   const [submittedPrompt, setSubmittedPrompt] = useState("")
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -159,6 +166,7 @@ export function ConversationShell({ onAnalysisComplete, onNewSession, onPromptAn
     }
 
     onPromptAnalyzed(analyzePrompt(prompt))
+    onPromptSubmitted(prompt)
 
     if (!hasSubmitted) {
       setSubmittedPrompt(prompt)

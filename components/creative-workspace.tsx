@@ -14,12 +14,19 @@ interface WorkspaceDirection {
 
 interface CreativeWorkspaceProps {
   isVisible: boolean
+  currentPrompt: string
   analysis: PromptAnalysis | null
   archivedSessions: WorkspaceSession[]
   onPromptSnapshotChange: (promptSnapshot: string) => void
 }
 
-export function CreativeWorkspace({ isVisible, analysis, archivedSessions, onPromptSnapshotChange }: CreativeWorkspaceProps) {
+export function CreativeWorkspace({
+  isVisible,
+  currentPrompt,
+  analysis,
+  archivedSessions,
+  onPromptSnapshotChange
+}: CreativeWorkspaceProps) {
   const [selectedDirection, setSelectedDirection] = useState<WorkspaceDirection | null>(null)
   const [showPromptWorkspace, setShowPromptWorkspace] = useState(false)
   const [promptAnalysis, setPromptAnalysis] = useState<PromptAnalysis | null>(analysis)
@@ -59,6 +66,7 @@ export function CreativeWorkspace({ isVisible, analysis, archivedSessions, onPro
       )}>
         <SemanticSteering
           isVisible={isVisible}
+          currentPrompt={currentPrompt}
           analysis={promptAnalysis}
           onSelectDirection={handleSelectDirection}
         />

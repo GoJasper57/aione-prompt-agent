@@ -7,10 +7,12 @@ import { Check } from "lucide-react"
 import { clarificationFramework } from "@/data/clarification-framework"
 import { vibeInterpretations } from "@/data/vibe-interpretations"
 import { PromptAnalysis } from "@/lib/intelligence/analyzePrompt"
+import { getRelevantVibes } from "@/lib/intelligence/getRelevantVibes"
 import { ClarificationDimension } from "@/types/ai-workspace"
 
 interface SemanticSteeringProps {
   isVisible: boolean
+  currentPrompt: string
   analysis: PromptAnalysis | null
   onSelectDirection: (direction: { promptTemplate: string; label: string } | null) => void
 }
@@ -39,26 +41,43 @@ const buildAnalyzedDimensions = (analysis: PromptAnalysis): ClarificationDimensi
       options: analysis.steeringSuggestions[dimension]?.slice(0, 4) ?? []
     }))
 
-export function SemanticSteering({ isVisible, analysis, onSelectDirection }: SemanticSteeringProps) {
+export function SemanticSteering({ isVisible, currentPrompt, analysis, onSelectDirection }: SemanticSteeringProps) {
   const [clarificationDimensions, setClarificationDimensions] = useState<ClarificationDimension[]>(clarificationFramework)
   const [expandedDimension, setExpandedDimension] = useState<string | null>(null)
   const [dimensionMenuPosition, setDimensionMenuPosition] = useState<{ left: number; top: number } | null>(null)
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null)
+  const [vibeOffset, setVibeOffset] = useState(0)
   const [explorationPhase, setExplorationPhase] = useState(0)
 
   const buildPromptDirection = (vibeId: string | null, dimensions: ClarificationDimension[]) => {
-    const vibe = vibeInterpretations.find(v => v.id === vibeId) ?? vibeInterpretations[0]
+    const vibe = relevantVibes.find(v => v.id === vibeId)
+    const fallbackVibe = vibeInterpretations[0]
     const selectedOptions = dimensions
       .filter(dimension => dimension.selectedOption)
       .map(dimension => `[${dimension.selectedOption}]`)
+    const vibePhrases = vibe?.steeringPhrases.map(phrase => `[${phrase}]`) ?? []
+    const basePrompt = (currentPrompt || fallbackVibe.promptTemplate).replace(/[.,\s]+$/, "")
+    const promptPhrases = [...selectedOptions, ...vibePhrases]
 
     return {
-      label: vibe.label,
-      promptTemplate: selectedOptions.length > 0
-        ? `${vibe.promptTemplate} Semantic steering: ${selectedOptions.join(", ")}.`
-        : vibe.promptTemplate
+      label: vibe?.title ?? fallbackVibe.label,
+      promptTemplate: promptPhrases.length > 0
+        ? `${basePrompt}, ${promptPhrases.join(", ")}.`
+        : `${basePrompt}.`
     }
   }
+
+  const selectedSteeringTags = clarificationDimensions
+    .flatMap(dimension => dimension.selectedOption ? [dimension.selectedOption] : [])
+  const relevantVibes = analysis
+    ? getRelevantVibes({
+        prompt: currentPrompt,
+        dimensionAnalysis: analysis.dimensionAnalysis,
+        semanticConcepts: analysis.semanticConcepts,
+        selectedSteeringTags,
+        offset: vibeOffset
+      })
+    : []
 
   useEffect(() => {
     if (!isVisible) {
@@ -78,7 +97,7 @@ export function SemanticSteering({ isVisible, analysis, onSelectDirection }: Sem
   useEffect(() => {
     if (!isVisible) return
     onSelectDirection(buildPromptDirection(selectedVibe, clarificationDimensions))
-  }, [isVisible, selectedVibe, clarificationDimensions, onSelectDirection])
+  }, [isVisible, currentPrompt, analysis, selectedVibe, clarificationDimensions, vibeOffset, onSelectDirection])
 
   useEffect(() => {
     if (!analysis) return
@@ -92,6 +111,8 @@ export function SemanticSteering({ isVisible, analysis, onSelectDirection }: Sem
           : undefined
       }))
     })
+    setSelectedVibe(null)
+    setVibeOffset(0)
   }, [analysis])
 
   const handleDimensionSelect = (dimensionId: string, option: string) => {
@@ -226,7 +247,7 @@ export function SemanticSteering({ isVisible, analysis, onSelectDirection }: Sem
           </p>
 
           <div className="grid gap-4 grid-cols-2">
-            {vibeInterpretations.map((vibe, index) => {
+            {relevantVibes.map((vibe, index) => {
               const isSelected = selectedVibe === vibe.id
               const isDimmed = selectedVibe && !isSelected
 
@@ -243,18 +264,11 @@ export function SemanticSteering({ isVisible, analysis, onSelectDirection }: Sem
                   style={{ transitionDelay: `${index * 60}ms` }}
                 >
                   <div className={cn(
-                    "absolute inset-0 bg-gradient-to-br transition-all duration-500",
-                    vibe.gradient
-                  )} />
-                  <div className={cn(
-                    "absolute w-24 h-24 rounded-full blur-2xl transition-opacity duration-500 bg-white/10",
-                    vibe.accentPosition === "top-right" && "top-0 right-0 -translate-y-1/2 translate-x-1/2",
-                    vibe.accentPosition === "top-left" && "top-0 left-0 -translate-y-1/2 -translate-x-1/2",
-                    vibe.accentPosition === "center" && "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
-                    vibe.accentPosition === "bottom" && "bottom-0 left-1/2 translate-y-1/2 -translate-x-1/2",
-                    vibe.accentPosition === "bottom-left" && "bottom-0 left-0 translate-y-1/2 -translate-x-1/2",
-                    isSelected ? "opacity-60" : "opacity-30 group-hover:opacity-50"
-                  )} />
+                    "absolute inset-0 transition-transform duration-500 bg-cover bg-center",
+                    isSelected ? "scale-105" : "group-hover:scale-105"
+                  )}
+                    style={{ backgroundImage: `url("${vibe.image}")` }}
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                   {isSelected && (
                     <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary flex items-center justify-center animate-scale-in">
@@ -266,16 +280,34 @@ export function SemanticSteering({ isVisible, analysis, onSelectDirection }: Sem
                       "text-sm font-medium text-white mb-0.5 transition-colors",
                       isSelected && "text-white"
                     )}>
-                      {vibe.label}
+                      {vibe.title}
                     </p>
-                    <p className="text-xs text-white/60 line-clamp-1">
-                      {vibe.atmosphere}
-                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {vibe.tags.slice(0, 3).map(tag => (
+                        <span key={tag} className="text-[10px] text-white/70">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </button>
               )
             })}
           </div>
+
+          {relevantVibes.length > 0 && (
+            <div className="pt-4">
+              <button
+                onClick={() => {
+                  setSelectedVibe(null)
+                  setVibeOffset(prev => prev + 8)
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Find More
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
