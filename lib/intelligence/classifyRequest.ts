@@ -1,4 +1,12 @@
-import creativeKeywords from "@/data/intelligence/creativeKeywords.json"
+import abstractEmotionPatterns from "@/data/intelligence/abstractEmotionPatterns.json"
+import creativeModifiers from "@/data/intelligence/creativeModifiers.json"
+import imaginativeEntities from "@/data/intelligence/imaginativeEntities.json"
+import motionPatterns from "@/data/intelligence/motionPatterns.json"
+import overridePatterns from "@/data/intelligence/overridePatterns.json"
+import relationalPatterns from "@/data/intelligence/relationalPatterns.json"
+import technicalTerms from "@/data/intelligence/technicalTerms.json"
+import utilitarianPhrases from "@/data/intelligence/utilitarianPhrases.json"
+import visualCreationPatterns from "@/data/intelligence/visualCreationPatterns.json"
 import blockedTerms from "@/data/safety/blockedTerms.json"
 
 export interface RequestClassification {
@@ -42,6 +50,13 @@ const matchesBlockedTerm = (prompt: string, term: string) => {
   return termPattern.test(normalize(prompt))
 }
 
+const matchesPattern = (prompt: string, pattern: string) => {
+  const escapedPattern = escapeRegExp(normalize(pattern)).replace(/\s+/g, "\\s+")
+  const patternBoundary = new RegExp(`(^|[^\\p{L}\\p{N}])${escapedPattern}(?=$|[^\\p{L}\\p{N}])`, "iu")
+
+  return patternBoundary.test(normalize(prompt))
+}
+
 const continuationSignals = [
   "abstract",
   "atmosphere",
@@ -81,11 +96,51 @@ const getSemanticOverlap = (currentPrompt: string, previousPrompt: string) => {
   return unionSize === 0 ? 0 : sharedTokenCount / unionSize
 }
 
-export function classifyRequest(prompt: string, previousPrompt?: string): RequestClassification {
+const countPatternMatches = (prompt: string, patterns: string[]) =>
+  patterns.filter(pattern => matchesPattern(prompt, pattern)).length
+
+const hasSceneComposition = (prompt: string) => {
   const normalizedPrompt = normalize(prompt)
-  const isAllowed = !blockedTerms.some(term => matchesBlockedTerm(prompt, term))
+  const promptTokens = tokenize(prompt)
+  const hasArticleLead = /^(a|an|the)\b/i.test(normalizedPrompt)
+  const hasVisualNoun = countPatternMatches(prompt, imaginativeEntities) > 0
+  const hasDescriptiveShape = promptTokens.length >= 3
+
+  return hasArticleLead && hasVisualNoun && hasDescriptiveShape
+}
+
+const getCreativeIntentScore = (prompt: string, isContinuation: boolean) => {
+  const imaginativeEntityScore = countPatternMatches(prompt, imaginativeEntities) * 2
+  const creativeModifierScore = countPatternMatches(prompt, creativeModifiers) * 2
+  const visualCreationScore = countPatternMatches(prompt, visualCreationPatterns) * 3
+  const motionScore = countPatternMatches(prompt, motionPatterns) * 2
+  const relationalScore = countPatternMatches(prompt, relationalPatterns) * 2
+  const emotionalScore = countPatternMatches(prompt, abstractEmotionPatterns) * 2
+  const sceneCompositionScore = hasSceneComposition(prompt) ? 2 : 0
+  const continuationScore = isContinuation ? 4 : 0
+  const technicalPenalty = countPatternMatches(prompt, technicalTerms) * 3
+  const utilitarianPenalty = countPatternMatches(prompt, utilitarianPhrases) * 4
+  const overridePenalty = countPatternMatches(prompt, overridePatterns) * 8
+
+  return imaginativeEntityScore
+    + creativeModifierScore
+    + visualCreationScore
+    + motionScore
+    + relationalScore
+    + emotionalScore
+    + sceneCompositionScore
+    + continuationScore
+    - technicalPenalty
+    - utilitarianPenalty
+    - overridePenalty
+}
+
+export function classifyRequest(prompt: string, previousPrompt?: string): RequestClassification {
+  const hasOverrideAttempt = overridePatterns.some(pattern => matchesPattern(prompt, pattern))
+  const isAllowed = !blockedTerms.some(term => matchesBlockedTerm(prompt, term)) && !hasOverrideAttempt
   const isContinuation = Boolean(previousPrompt && isContinuationRequest(prompt))
-  const isRelevant = isContinuation || creativeKeywords.some(keyword => normalizedPrompt.includes(normalize(keyword)))
+  const creativeIntentScore = getCreativeIntentScore(prompt, isContinuation)
+  const isRelevant = isAllowed && creativeIntentScore >= 2
   const currentTokenCount = tokenize(prompt).length
   const semanticOverlap = previousPrompt ? getSemanticOverlap(prompt, previousPrompt) : 1
 

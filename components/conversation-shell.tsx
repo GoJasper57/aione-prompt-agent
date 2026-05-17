@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react"
 import { IntentInput } from "@/components/intent-input"
 import { analyzePrompt, PromptAnalysis } from "@/lib/intelligence/analyzePrompt"
 import { classifyRequest } from "@/lib/intelligence/classifyRequest"
+import { normalizePromptInput } from "@/lib/intelligence/normalizePromptInput"
 import { Message, SessionMessage } from "@/types/ai-workspace"
 
 interface ConversationShellProps {
@@ -165,8 +166,9 @@ export function ConversationShell({
       return
     }
 
-    onPromptAnalyzed(analyzePrompt(prompt))
-    onPromptSubmitted(prompt)
+    const normalizedPrompt = normalizePromptInput(prompt)
+    onPromptAnalyzed(analyzePrompt(normalizedPrompt))
+    onPromptSubmitted(normalizedPrompt)
 
     if (!hasSubmitted) {
       setSubmittedPrompt(prompt)
