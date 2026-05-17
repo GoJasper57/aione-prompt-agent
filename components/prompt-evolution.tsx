@@ -45,6 +45,8 @@ export function PromptEvolution({
   const [isEditingPrompt, setIsEditingPrompt] = useState(false)
   const [editPromptText, setEditPromptText] = useState("")
   const [editBaseFragments, setEditBaseFragments] = useState<PromptFragment[]>([])
+  const [editingVersionField, setEditingVersionField] = useState<{ id: string; field: "label" | "changeLog" } | null>(null)
+  const [editingVersionValue, setEditingVersionValue] = useState("")
 
   useEffect(() => {
     if (!initialPrompt) {
@@ -96,10 +98,18 @@ export function PromptEvolution({
         changeLog: session.changeLog
       }))
 
-    setPromptVersions(prev => [
-      ...archivedVersions,
-      ...prev.filter(version => !version.id.startsWith("session-"))
-    ])
+    setPromptVersions(prev => {
+      const previousVersions = new Map(prev.map(version => [version.id, version]))
+
+      return [
+        ...archivedVersions.map(version => ({
+          ...version,
+          label: previousVersions.get(version.id)?.label ?? version.label,
+          changeLog: previousVersions.get(version.id)?.changeLog ?? version.changeLog
+        })),
+        ...prev.filter(version => !version.id.startsWith("session-"))
+      ]
+    })
   }, [archivedSessions])
 
   useEffect(() => {
@@ -227,6 +237,29 @@ export function PromptEvolution({
     setCopied(true)
     createPromptSnapshot()
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const updateVersionField = (versionId: string, field: "label" | "changeLog", value: string) => {
+    const nextValue = value.trim()
+    if (!nextValue) return
+
+    setPromptVersions(prev => prev.map(version =>
+      version.id === versionId
+        ? { ...version, [field]: nextValue }
+        : version
+    ))
+  }
+
+  const beginVersionFieldEdit = (versionId: string, field: "label" | "changeLog", value: string) => {
+    setEditingVersionField({ id: versionId, field })
+    setEditingVersionValue(value)
+  }
+
+  const commitVersionFieldEdit = () => {
+    if (!editingVersionField) return
+    updateVersionField(editingVersionField.id, editingVersionField.field, editingVersionValue)
+    setEditingVersionField(null)
+    setEditingVersionValue("")
   }
 
   const handleFragmentMenuToggle = (fragmentId: string, element: HTMLButtonElement) => {
@@ -411,9 +444,10 @@ export function PromptEvolution({
           {promptVersions.filter(v => v.isCheckpoint).map((version, index, filtered) => {
             const isActive = activeVersion === version.id
             const isLatest = index === filtered.length - 1
+            const versionNumber = `V${index + 1}`
 
             return (
-              <button
+              <div
                 key={version.id}
                 onClick={() => {
                   setActiveVersion(version.id)
@@ -438,25 +472,78 @@ export function PromptEvolution({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn(
-                        "text-sm font-medium",
+                        "text-xs font-medium",
                         isActive ? "text-primary" : "text-foreground"
                       )}>
-                        {index + 1}
+                        {versionNumber}
                       </span>
+                      {editingVersionField?.id === version.id && editingVersionField.field === "label" ? (
+                        <input
+                          autoFocus
+                          value={editingVersionValue}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => setEditingVersionValue(event.target.value)}
+                          onBlur={commitVersionFieldEdit}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") commitVersionFieldEdit()
+                            if (event.key === "Escape") {
+                              setEditingVersionField(null)
+                              setEditingVersionValue("")
+                            }
+                          }}
+                          className="min-w-0 flex-1 bg-transparent text-sm font-medium text-foreground outline-none border-b border-primary/40"
+                        />
+                      ) : (
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            beginVersionFieldEdit(version.id, "label", version.label)
+                          }}
+                          className={cn(
+                            "min-w-0 truncate text-left text-sm font-medium hover:text-primary transition-colors",
+                            isActive ? "text-primary" : "text-foreground"
+                          )}
+                        >
+                          {version.label}
+                        </button>
+                      )}
                       {isLatest && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
                           Current
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">{version.label}</p>
-                    {version.changeLog && (
-                      <p className="text-xs text-muted-foreground/80 mt-1">{version.changeLog}</p>
+                    {editingVersionField?.id === version.id && editingVersionField.field === "changeLog" ? (
+                      <input
+                        autoFocus
+                        value={editingVersionValue}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => setEditingVersionValue(event.target.value)}
+                        onBlur={commitVersionFieldEdit}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") commitVersionFieldEdit()
+                          if (event.key === "Escape") {
+                            setEditingVersionField(null)
+                            setEditingVersionValue("")
+                          }
+                        }}
+                        className="mt-1 w-full bg-transparent text-xs text-muted-foreground/80 outline-none border-b border-primary/40"
+                      />
+                    ) : (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          beginVersionFieldEdit(version.id, "changeLog", version.changeLog ?? "")
+                        }}
+                        className="mt-1 block text-xs text-muted-foreground/80 hover:text-foreground transition-colors text-left"
+                      >
+                        {version.changeLog || "Add change log"}
+                      </button>
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground flex-shrink-0">{version.timestamp}</span>
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
