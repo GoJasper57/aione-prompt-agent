@@ -22,8 +22,8 @@ const featuredExample = {
 }
 
 const thinkingSequence: Message[] = [
-  { id: "t1", type: "ai-insight", content: "I can see the emotional atmosphere you're reaching for." },
-  { id: "t2", type: "ai-transition", content: "Explore visual directions on the right to refine and evolve your prompt." },
+  { id: "t1", type: "ai-insight", content: "I can see the creative intent taking shape." },
+  { id: "t2", type: "ai-transition", content: "Explore directions on the right to make the prompt more precise and expressive." },
 ]
 
 export function ConversationShell({
@@ -138,7 +138,7 @@ export function ConversationShell({
         {
           id: `safety-${Date.now()}`,
           type: "ai-transition",
-          content: "AIONE currently supports safe creative prompt exploration.",
+          content: "Potentially restricted or unsafe content was detected.",
           timestamp: Date.now()
         }
       ])
@@ -158,7 +158,7 @@ export function ConversationShell({
         {
           id: `relevance-${Date.now()}`,
           type: "ai-transition",
-          content: "AIONE currently supports creative prompt exploration.",
+          content: "AIONE currently focuses on prompt creation and refinement, and may not respond to unrelated requests.",
           timestamp: Date.now()
         }
       ])
@@ -230,7 +230,7 @@ export function ConversationShell({
           </div>
           <div>
             <h1 className="workspace-panel-title">AIONE</h1>
-            <p className="workspace-panel-subtitle">Creative Clarification</p>
+            <p className="workspace-panel-subtitle">From Imagination to Prompt</p>
           </div>
         </div>
       </div>
@@ -282,10 +282,10 @@ export function ConversationShell({
               </div>
             )}
 
-            {analysisCompleteLabel && (
+            {analysisCompleteLabel && showAnalysisHint && (
               <div className="pt-2 animate-fade-in">
                 <span className="workspace-muted">
-                  {showAnalysisHint ? "Shaping your direction..." : "Choose an interpretation to continue."}
+                  Shaping your direction...
                 </span>
               </div>
             )}
@@ -314,6 +314,30 @@ function MessageBubble({ message }: { message: Message }) {
       <div className="flex justify-end animate-fade-in">
         <div className="max-w-[90%] bg-primary/15 border border-primary/25 rounded-2xl rounded-br-md px-4 py-3">
           <p className="text-sm text-foreground leading-relaxed">{message.content}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (message.id.startsWith("safety-")) {
+    return (
+      <div className="flex items-start gap-3 animate-fade-in">
+        <div className="w-6 h-6 rounded-full flex items-center justify-center bg-chart-4/20">
+          <div className="w-2 h-2 rounded-full bg-chart-4" />
+        </div>
+        <div className="flex-1 space-y-2">
+          <p className="text-sm leading-relaxed text-foreground">
+            {message.content}
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            AIONE currently supports safe creative prompting only.
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            If you believe this was flagged incorrectly, you can request a manual review.
+          </p>
+          <button className="mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            Request Review
+          </button>
         </div>
       </div>
     )

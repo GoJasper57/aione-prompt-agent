@@ -161,9 +161,9 @@ export function SemanticSteering({ isVisible, currentPrompt, analysis, onSelectD
           "transition-all duration-500",
           explorationPhase >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         )}>
-          <h2 className="workspace-panel-title">Shape Your Vision</h2>
+          <h2 className="workspace-panel-title">Refine and expand your prompt</h2>
           <p className="workspace-panel-subtitle">
-            Explore moods, atmospheres, and creative possibilities.
+            Explore moods, styles, and creative directions to make your idea more vivid and precise.
           </p>
         </div>
       </div>
@@ -174,7 +174,7 @@ export function SemanticSteering({ isVisible, currentPrompt, analysis, onSelectD
           explorationPhase >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         )}>
           <p className="workspace-section-title">
-            Structural Dimensions
+            Expand your idea
           </p>
           <div className="flex flex-wrap gap-3">
             {shapableDimensions.map((dimension, index) => (
@@ -243,7 +243,7 @@ export function SemanticSteering({ isVisible, currentPrompt, analysis, onSelectD
           explorationPhase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
         )}>
           <p className="workspace-section-title">
-            Emotional Interpretations
+            Explore possible styles
           </p>
 
           <div className="grid gap-4 grid-cols-2">
