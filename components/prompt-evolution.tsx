@@ -25,6 +25,9 @@ const snapshotLabels = [
   "Captured semantic checkpoint"
 ]
 
+const isDefaultVersionLabel = (label: string, versionNumber: string) =>
+  label === versionNumber || /^V\d+$/i.test(label) || /^Initial .+ direction$/i.test(label)
+
 export function PromptEvolution({
   initialPrompt,
   initialLabel,
@@ -145,6 +148,84 @@ export function PromptEvolution({
   }
 
   const getPromptString = () => isEditingPrompt ? editPromptText : getCurrentFragments().map(fragment => fragment.text).join("")
+
+  const createEditableFallbackFragments = (text: string): PromptFragment[] => {
+    const clauses = text.split(/,\s*/)
+    let id = 0
+
+    if (clauses.length <= 1) {
+      const promptText = text.trim()
+
+      return promptText
+        ? [{
+            id: `f${id}`,
+            text: promptText,
+            isEditable: true,
+            alternatives: getAlternativesForFragment(promptText)
+          }]
+        : []
+    }
+
+    return clauses.flatMap((clause, index) => {
+      const fragments: PromptFragment[] = []
+      const trimmedClause = clause.trim()
+      const clauseText = trimmedClause.replace(/\.$/, "")
+      const hasTerminalPeriod = trimmedClause.endsWith(".")
+
+      if (index > 0) {
+        fragments.push({ id: `f${id++}`, text: ", ", isEditable: false })
+      }
+
+      if (clauseText) {
+        fragments.push({
+          id: `f${id++}`,
+          text: clauseText,
+          isEditable: true,
+          alternatives: getAlternativesForFragment(clauseText)
+        })
+      }
+
+      if (hasTerminalPeriod) {
+        fragments.push({ id: `f${id++}`, text: ".", isEditable: false })
+      }
+
+      return fragments
+    })
+  }
+
+  const refreshSemanticFragments = (fragments: PromptFragment[]) => {
+    const refreshedFragments = fragments.map((fragment, index) => ({
+      ...fragment,
+      id: `f${index}`,
+      alternatives: fragment.isEditable ? getAlternativesForFragment(fragment.text) : undefined
+    }))
+
+    if (refreshedFragments.some(fragment => fragment.isEditable)) {
+      return refreshedFragments
+    }
+
+    return createEditableFallbackFragments(refreshedFragments.map(fragment => fragment.text).join(""))
+  }
+
+  const activatePromptVersion = (version: PromptVersion) => {
+    const refreshedFragments = refreshSemanticFragments(version.fragments)
+
+    setActiveVersion(version.id)
+    setWorkingFragments(refreshedFragments)
+    setPromptVersions(prev => prev.map(promptVersion =>
+      promptVersion.id === version.id
+        ? { ...promptVersion, fragments: refreshedFragments }
+        : promptVersion
+    ))
+    setHasUnsavedChanges(false)
+    setIsEditingPrompt(false)
+    setEditPromptText(refreshedFragments.map(fragment => fragment.text).join(""))
+    setEditBaseFragments(refreshedFragments)
+    setHoveredFragment(null)
+    setExpandedFragment(null)
+    setFragmentMenuPosition(null)
+    setRecentlyChanged(null)
+  }
 
   const createFragmentsFromText = (text: string, previousFragments: PromptFragment[]) => {
     const editableFragments = previousFragments.filter(fragment => fragment.isEditable && fragment.text.trim())
@@ -445,18 +526,12 @@ export function PromptEvolution({
             const isActive = activeVersion === version.id
             const isLatest = index === filtered.length - 1
             const versionNumber = `V${index + 1}`
+            const hasCustomTitle = !isDefaultVersionLabel(version.label, versionNumber)
 
             return (
               <div
                 key={version.id}
-                onClick={() => {
-                  setActiveVersion(version.id)
-                  setWorkingFragments(version.fragments)
-                  setHasUnsavedChanges(false)
-                  setIsEditingPrompt(false)
-                  setEditPromptText(version.fragments.map(fragment => fragment.text).join(""))
-                  setEditBaseFragments(version.fragments)
-                }}
+                onClick={() => activatePromptVersion(version)}
                 className={cn(
                   "group relative w-full text-left transition-all"
                 )}
@@ -493,7 +568,7 @@ export function PromptEvolution({
                           }}
                           className="min-w-0 flex-1 bg-transparent text-sm font-medium text-foreground outline-none border-b border-primary/40"
                         />
-                      ) : (
+                      ) : hasCustomTitle && (
                         <button
                           onClick={(event) => {
                             event.stopPropagation()

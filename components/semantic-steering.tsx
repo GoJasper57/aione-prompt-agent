@@ -20,8 +20,12 @@ interface SemanticSteeringProps {
 const analyzedDimensionMeta: Record<string, { label: string; description: string }> = {
   environment: { label: "Environment", description: "Where this takes place" },
   character: { label: "Character", description: "Who or what is present" },
+  lighting: { label: "Lighting", description: "How light shapes the scene" },
+  cameraLanguage: { label: "Camera Language", description: "How the scene is framed or filmed" },
   emotion: { label: "Emotion", description: "The feeling it carries" },
   motion: { label: "Motion", description: "How stillness or movement behaves" },
+  composition: { label: "Composition", description: "How the image is framed" },
+  style: { label: "Style", description: "The visual direction it follows" },
   materiality: { label: "Materiality", description: "What surfaces and forms are made of" },
   atmosphere: { label: "Atmosphere", description: "The surrounding sensory mood" },
   worldLogic: { label: "World Logic", description: "The rules shaping the idea" },
@@ -31,8 +35,11 @@ const analyzedDimensionMeta: Record<string, { label: string; description: string
 }
 
 const buildAnalyzedDimensions = (analysis: PromptAnalysis): ClarificationDimension[] =>
-  Object.entries(analysis.dimensionAnalysis)
-    .filter(([, strength]) => strength === "missing" || strength === "weak")
+  Object.entries(analysis.dimensionScores ?? analysis.dimensionAnalysis)
+    .filter(([, score]) => typeof score === "string"
+      ? score === "missing" || score === "weak"
+      : score.recommendExpansion
+    )
     .map(([dimension]) => ({
       id: dimension,
       label: analyzedDimensionMeta[dimension]?.label ?? dimension,
