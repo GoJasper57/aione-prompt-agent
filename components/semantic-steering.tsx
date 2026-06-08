@@ -35,11 +35,8 @@ const analyzedDimensionMeta: Record<string, { label: string; description: string
 }
 
 const buildAnalyzedDimensions = (analysis: PromptAnalysis): ClarificationDimension[] =>
-  Object.entries(analysis.dimensionScores ?? analysis.dimensionAnalysis)
-    .filter(([, score]) => typeof score === "string"
-      ? score === "missing" || score === "weak"
-      : score.recommendExpansion
-    )
+  Object.entries(analysis.dimensionAnalysis)
+    .filter(([, score]) => score === "missing" || score === "weak")
     .map(([dimension]) => ({
       id: dimension,
       label: analyzedDimensionMeta[dimension]?.label ?? dimension,

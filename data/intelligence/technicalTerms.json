@@ -14,7 +14,6 @@
   "dataset",
   "debugger",
   "economics",
-  "email",
   "equation",
   "excel",
   "finance",
@@ -27,9 +26,7 @@
   "json",
   "law",
   "legal",
-  "math",
   "mortgage",
-  "network",
   "python",
   "regex",
   "research paper",
@@ -41,6 +38,5 @@
   "tax",
   "taxes",
   "typescript",
-  "weather",
   "website"
 ]
